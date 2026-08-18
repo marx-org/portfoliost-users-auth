@@ -151,11 +151,43 @@ export function createUsersRoutes(db?: DB) {
     return c.json(parseJson(prefs.onboardingStatus, { completed: false }))
   })
 
+  users.patch("/onboarding/status", async (c) => {
+    const identity = c.get("userIdentity")
+    const body = await c.req.json()
+    const now = new Date().toISOString()
+    const d = getDbInstance()
+
+    await getOrCreatePreferences(d, identity.id)
+
+    await d
+      .update(userPreferences)
+      .set({ onboardingStatus: JSON.stringify(body), updatedAt: now })
+      .where(eq(userPreferences.userId, identity.id))
+
+    return c.json(body)
+  })
+
   users.get("/onboarding/draft", async (c) => {
     const identity = c.get("userIdentity")
     const d = getDbInstance()
     const prefs = await getOrCreatePreferences(d, identity.id)
     return c.json(parseJson(prefs.onboardingDraft, { draft: null }))
+  })
+
+  users.patch("/onboarding/draft", async (c) => {
+    const identity = c.get("userIdentity")
+    const body = await c.req.json()
+    const now = new Date().toISOString()
+    const d = getDbInstance()
+
+    await getOrCreatePreferences(d, identity.id)
+
+    await d
+      .update(userPreferences)
+      .set({ onboardingDraft: JSON.stringify(body), updatedAt: now })
+      .where(eq(userPreferences.userId, identity.id))
+
+    return c.json(body)
   })
 
   users.post("/change-password", async (c) => {
