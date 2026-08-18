@@ -12,6 +12,7 @@
     "db:migrate": "drizzle-kit migrate"
   },
   "dependencies": {
+    "@hono/node-server": "^2.1.1",
     "@libsql/client": "^0.17.4",
     "@libsql/core": "^0.17.4",
     "drizzle-orm": "^0.45.2",
