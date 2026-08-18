@@ -1,9 +1,20 @@
-import { createClient } from "@libsql/client"
+import { createClient, type Client } from "@libsql/client"
 import { drizzle } from "drizzle-orm/libsql"
 import * as schema from "./schema.js"
 
-const client = createClient({
-  url: "file:data/portfoliost.db",
-})
+let _client: Client | null = null
+let _db: ReturnType<typeof drizzle<typeof schema>> | null = null
 
-export const db = drizzle(client, { schema })
+export function getDb() {
+  if (!_db) {
+    _client = createClient({ url: "file:data/portfoliost.db" })
+    _db = drizzle(_client, { schema })
+  }
+  return _db
+}
+
+export function createTestDb() {
+  const client = createClient({ url: ":memory:" })
+  const db = drizzle(client, { schema })
+  return { db, client }
+}
