@@ -2,9 +2,6 @@ FROM node:22-alpine
 
 WORKDIR /app
 
-ARG GITHUB_TOKEN
-RUN echo "//npm.pkg.github.com/:_authToken=${GITHUB_TOKEN}" > .npmrc
-
 COPY package.json package-lock.json ./
 RUN npm ci
 
@@ -12,8 +9,6 @@ COPY tsconfig.json ./
 COPY drizzle.config.ts ./
 COPY drizzle/ drizzle/
 COPY src/ src/
-
-RUN rm .npmrc
 
 RUN npm run build
 

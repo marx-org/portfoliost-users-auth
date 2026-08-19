@@ -16,10 +16,11 @@
     "@hono/node-server": "^2.1.1",
     "@libsql/client": "^0.17.4",
     "@libsql/core": "^0.17.4",
-    "@marx2/contracts": "^1.0.0",
+    "@marx2/contracts": "github:Marx2/portfoliost-contracts",
     "drizzle-orm": "^0.45.2",
     "hono": "^4.7.0",
     "hono-zod-openapi": "^1.1.1",
+    "jose": "^6.2.9",
     "yaml": "^2.9.0",
     "zod": "^4.4.3"
   },
