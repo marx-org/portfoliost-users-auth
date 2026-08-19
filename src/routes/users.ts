@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm"
 import { openApi } from "hono-zod-openapi"
 import { getDb } from "../db/index.js"
 import { userPreferences } from "../db/schema.js"
-import { userIdentityMiddleware } from "../context.js"
+import { userIdentityMiddleware } from "../auth.js"
 import type { drizzle } from "drizzle-orm/libsql"
 import {
   UserProfileSchema,
@@ -74,8 +74,8 @@ export function createUsersRoutes(db?: DB) {
         email: identity.email,
         firstName: identity.firstName,
         lastName: identity.lastName,
-        language: prefs.language ?? identity.language,
-        createdAt: identity.createdAt,
+        language: prefs.language ?? "en",
+        createdAt: prefs.createdAt,
         updatedAt: prefs.updatedAt,
         isDemoUser: false,
       })
@@ -124,8 +124,8 @@ export function createUsersRoutes(db?: DB) {
         email: identity.email,
         firstName: identity.firstName,
         lastName: identity.lastName,
-        language: prefs.language ?? identity.language,
-        createdAt: identity.createdAt,
+        language: prefs.language ?? "en",
+        createdAt: prefs.createdAt,
         updatedAt: prefs.updatedAt,
         isDemoUser: false,
       })
