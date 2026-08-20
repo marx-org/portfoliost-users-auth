@@ -5,6 +5,7 @@ export const UserProfileSchema = z.object({
   email: z.string(),
   firstName: z.string().nullable(),
   lastName: z.string().nullable(),
+  avatarUrl: z.string().url().nullable(),
   groups: z.array(z.string()),
   language: z.string(),
   createdAt: z.string(),

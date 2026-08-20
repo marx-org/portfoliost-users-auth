@@ -6,6 +6,7 @@ export interface UserIdentity {
   email: string
   firstName: string
   lastName: string
+  avatarUrl: string | null
   groups: string[]
 }
 
@@ -58,6 +59,7 @@ export async function validateJwt(c: Context, next: Next) {
       email: payload.email as string,
       firstName: (payload.given_name as string) || "",
       lastName: (payload.family_name as string) || "",
+      avatarUrl: (payload.picture as string) || null,
       groups: (payload.groups as string[]) || [],
     })
 
@@ -79,13 +81,14 @@ export async function userIdentityMiddleware(c: Context, next: Next) {
   const email = c.req.header("X-User-Email")
   const firstName = c.req.header("X-User-FirstName") ?? ""
   const lastName = c.req.header("X-User-LastName") ?? ""
+  const avatarUrl = c.req.header("X-User-AvatarUrl") || null
   const groups = c.req.header("X-User-Groups")?.split(",") || ["portfoliost_admin"]
 
   if (!id || !email) {
     return c.json({ error: "Unauthorized", message: "Missing user identity" }, 401)
   }
 
-  c.set("userIdentity", { id, email, firstName, lastName, groups })
+  c.set("userIdentity", { id, email, firstName, lastName, avatarUrl, groups })
   await next()
 }
 
