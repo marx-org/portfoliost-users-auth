@@ -85,30 +85,28 @@ export function createAuthRoutes(db?: DB) {
     try {
       const tokenResponse = await exchangeWithPocketID(body)
 
-      // For now, we'll use the access_token as the token
-      // In a real implementation, we'd validate the JWT and extract claims
-      // For now, return a mock user response
       const db = getDbInstance()
-      const mockUser = {
-        id: "mock-user-id",
-        email: "user@example.com",
-        firstName: "Mock",
-        lastName: "User",
-        groups: ["portfoliost_admin"],
-      }
 
-      // Upsert user preferences
-      await getOrCreatePreferences(db, mockUser.id)
+      // Decode id_token to extract real user claims
+      const idParts = tokenResponse.id_token.split(".")
+      const idPayload = JSON.parse(Buffer.from(idParts[1], "base64url").toString())
+
+      const userId = idPayload.sub
+      const email = idPayload.email || ""
+      const firstName = idPayload.given_name || ""
+      const lastName = idPayload.family_name || ""
+
+      await getOrCreatePreferences(db, userId)
 
       return c.json({
-        access_token: tokenResponse.access_token,
+        access_token: tokenResponse.id_token,
         token_type: tokenResponse.token_type,
         expires_in: tokenResponse.expires_in,
         user: {
-          id: mockUser.id,
-          email: mockUser.email,
-          firstName: mockUser.firstName,
-          lastName: mockUser.lastName,
+          id: userId,
+          email,
+          firstName,
+          lastName,
           language: "en",
           role: "user",
           isDemoUser: false,
