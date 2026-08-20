@@ -9,7 +9,7 @@ type DB = ReturnType<typeof drizzle>
 
 interface TokenExchangeRequest {
   code: string
-  code_verifier: string
+  verifier: string
   redirect_uri: string
 }
 
@@ -32,7 +32,7 @@ async function exchangeWithPocketID(req: TokenExchangeRequest): Promise<PocketID
   const params = new URLSearchParams({
     grant_type: "authorization_code",
     code: req.code,
-    code_verifier: req.code_verifier,
+    code_verifier: req.verifier,
     redirect_uri: req.redirect_uri,
     client_id: clientId,
   })
@@ -77,7 +77,7 @@ export function createAuthRoutes(db?: DB) {
   router.post("/token", async (c) => {
     const body = await c.req.json() as TokenExchangeRequest
 
-    if (!body.code || !body.code_verifier || !body.redirect_uri) {
+    if (!body.code || !body.verifier || !body.redirect_uri) {
       return c.json({ error: "Bad Request", message: "Missing required fields" }, 400)
     }
 
