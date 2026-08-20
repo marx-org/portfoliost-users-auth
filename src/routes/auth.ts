@@ -25,7 +25,7 @@ async function exchangeWithPocketID(req: TokenExchangeRequest): Promise<PocketID
   const clientId = process.env.POCKETID_CLIENT_ID
   const clientSecret = process.env.POCKETID_CLIENT_SECRET
 
-  if (!tokenUrl || !clientId || !clientSecret) {
+  if (!tokenUrl || !clientId) {
     throw new Error("PocketID not configured")
   }
 
@@ -35,8 +35,11 @@ async function exchangeWithPocketID(req: TokenExchangeRequest): Promise<PocketID
     code_verifier: req.code_verifier,
     redirect_uri: req.redirect_uri,
     client_id: clientId,
-    client_secret: clientSecret,
   })
+
+  if (clientSecret) {
+    params.set("client_secret", clientSecret)
+  }
 
   const response = await fetch(tokenUrl, {
     method: "POST",
