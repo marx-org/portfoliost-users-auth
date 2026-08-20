@@ -49,6 +49,7 @@ async function exchangeWithPocketID(req: TokenExchangeRequest): Promise<PocketID
 
   if (!response.ok) {
     const error = await response.text()
+    console.error("PocketID token exchange failed:", response.status, error)
     throw new Error(`Token exchange failed: ${error}`)
   }
 
@@ -116,6 +117,7 @@ export function createAuthRoutes(db?: DB) {
         },
       })
     } catch (error) {
+      console.error("Token exchange error:", error)
       // If PocketID is not configured, return a mock response for development
       if (process.env.NODE_ENV !== "production") {
         const db = getDbInstance()
