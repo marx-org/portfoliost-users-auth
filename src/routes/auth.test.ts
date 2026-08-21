@@ -49,7 +49,7 @@ describe("Auth Routes", () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           code: "test-code",
-          code_verifier: "test-verifier",
+          verifier: "test-verifier",
           redirect_uri: "http://localhost:3000/auth/callback",
         }),
       })
