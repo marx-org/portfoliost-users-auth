@@ -1,40 +1,25 @@
-import { describe, it, expect, vi, beforeEach } from "vitest"
-import { createClient } from "@libsql/client"
-import { drizzle } from "drizzle-orm/libsql"
+import { describe, it, expect, beforeEach, afterEach } from "vitest"
 import { Hono } from "hono"
 import { createAuthRoutes } from "./auth.js"
-
-function createTestApp() {
-  const client = createClient({ url: ":memory:" })
-  const db = drizzle(client)
-  const app = new Hono()
-  app.route("/api/auth", createAuthRoutes(db))
-  return { app, client }
-}
+import { createTestDb } from "../db/test-db.js"
 
 describe("Auth Routes", () => {
-  let ctx: ReturnType<typeof createTestApp>
+  let ctx: Awaited<ReturnType<typeof createTestDb>>
+  let app: Hono
 
   beforeEach(async () => {
-    ctx = createTestApp()
-    await ctx.client.execute(`
-      CREATE TABLE IF NOT EXISTS user_preferences (
-        user_id TEXT PRIMARY KEY,
-        language TEXT NOT NULL DEFAULT 'en',
-        ui_preferences TEXT,
-        custom_benchmarks TEXT,
-        custom_timeframes TEXT,
-        onboarding_status TEXT,
-        onboarding_draft TEXT,
-        created_at TEXT NOT NULL,
-        updated_at TEXT NOT NULL
-      )
-    `)
+    ctx = await createTestDb()
+    app = new Hono()
+    app.route("/api/auth", createAuthRoutes(ctx.db))
+  })
+
+  afterEach(async () => {
+    await ctx.client.close()
   })
 
   describe("POST /api/auth/token", () => {
     it("returns 400 for missing fields", async () => {
-      const res = await ctx.app.request("/api/auth/token", {
+      const res = await app.request("/api/auth/token", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({}),
@@ -44,7 +29,7 @@ describe("Auth Routes", () => {
 
     it("returns mock token in development mode", async () => {
       process.env.NODE_ENV = "development"
-      const res = await ctx.app.request("/api/auth/token", {
+      const res = await app.request("/api/auth/token", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -64,7 +49,7 @@ describe("Auth Routes", () => {
 
   describe("POST /api/auth/logout", () => {
     it("returns success", async () => {
-      const res = await ctx.app.request("/api/auth/logout", {
+      const res = await app.request("/api/auth/logout", {
         method: "POST",
       })
       expect(res.status).toBe(200)

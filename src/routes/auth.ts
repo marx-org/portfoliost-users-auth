@@ -1,11 +1,8 @@
 import { Hono } from "hono"
 import { eq } from "drizzle-orm"
 import { userIdentityMiddleware } from "../auth.js"
-import { getDb } from "../db/index.js"
+import { getDb, type DB } from "../db/index.js"
 import { userPreferences } from "../db/schema.js"
-import type { drizzle } from "drizzle-orm/libsql"
-
-type DB = ReturnType<typeof drizzle>
 
 interface TokenExchangeRequest {
   code: string
