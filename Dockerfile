@@ -13,8 +13,6 @@ COPY seed/ seed/
 
 RUN npm run build
 
-RUN mkdir -p data
-
 ENV PORT=3000
 ENV HOST=0.0.0.0
 EXPOSE 3000

@@ -1,26 +1,29 @@
-import { createClient } from "@libsql/client"
+import postgres from "postgres"
 import { readdir, readFile } from "fs/promises"
 import { join } from "path"
 
 export async function seed(dbUrl: string, seedDir: string) {
-  const client = createClient({ url: dbUrl })
+  const sql = postgres(dbUrl, { max: 1 })
 
-  const result = await client.execute("SELECT COUNT(*) as count FROM user_preferences")
-  const rowCount = Number(result.rows[0].count)
-  if (rowCount > 0) {
-    console.log(`user_preferences has ${rowCount} row(s), skipping seed`)
-    return false
+  try {
+    const rows = await sql`SELECT COUNT(*)::int AS count FROM user_preferences`
+    if (rows[0].count > 0) {
+      console.log(`user_preferences has ${rows[0].count} row(s), skipping seed`)
+      return false
+    }
+
+    console.log("user_preferences is empty, running seed...")
+
+    const files = (await readdir(seedDir)).filter((f) => f.endsWith(".sql")).sort()
+    for (const file of files) {
+      const content = await readFile(join(seedDir, file), "utf-8")
+      await sql.unsafe(content)
+      console.log(`  Seeded: ${file}`)
+    }
+
+    console.log("Seed complete")
+    return true
+  } finally {
+    await sql.end()
   }
-
-  console.log("user_preferences is empty, running seed...")
-
-  const files = (await readdir(seedDir)).filter((f) => f.endsWith(".sql")).sort()
-  for (const file of files) {
-    const sql = await readFile(join(seedDir, file), "utf-8")
-    await client.executeMultiple(sql)
-    console.log(`  Seeded: ${file}`)
-  }
-
-  console.log("Seed complete")
-  return true
 }

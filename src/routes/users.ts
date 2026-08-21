@@ -1,10 +1,9 @@
 import { Hono } from "hono"
 import { eq } from "drizzle-orm"
 import { openApi } from "hono-zod-openapi"
-import { getDb } from "../db/index.js"
+import { getDb, type DB } from "../db/index.js"
 import { userPreferences } from "../db/schema.js"
 import { userIdentityMiddleware } from "../auth.js"
-import type { drizzle } from "drizzle-orm/libsql"
 import {
   UserProfileSchema,
   UpdateProfileRequestSchema,
@@ -16,8 +15,6 @@ import {
   OnboardingDraftSchema,
   ErrorResponseSchema,
 } from "../schemas/users.js"
-
-type DB = ReturnType<typeof drizzle>
 
 function parseJson<T>(value: unknown, fallback: T): T {
   if (value === null || value === undefined) return fallback
@@ -189,7 +186,7 @@ export function createUsersRoutes(db?: DB) {
       await getOrCreatePreferences(d, identity.id)
 
       const set: Record<string, unknown> = { updatedAt: now }
-      if (body.uiPreferences !== undefined) set.uiPreferences = JSON.stringify(body.uiPreferences)
+      if (body.uiPreferences !== undefined) set.uiPreferences = body.uiPreferences
 
       await d
         .update(userPreferences)
@@ -297,7 +294,7 @@ export function createUsersRoutes(db?: DB) {
 
       await d
         .update(userPreferences)
-        .set({ onboardingStatus: JSON.stringify(body), updatedAt: now })
+        .set({ onboardingStatus: body, updatedAt: now })
         .where(eq(userPreferences.userId, identity.id))
 
       return c.json(body)
@@ -351,7 +348,7 @@ export function createUsersRoutes(db?: DB) {
 
       await d
         .update(userPreferences)
-        .set({ onboardingDraft: JSON.stringify(body), updatedAt: now })
+        .set({ onboardingDraft: body, updatedAt: now })
         .where(eq(userPreferences.userId, identity.id))
 
       return c.json(body)
