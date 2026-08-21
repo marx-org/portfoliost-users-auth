@@ -7,7 +7,8 @@ let _db: ReturnType<typeof drizzle<typeof schema>> | null = null
 
 export function getDb() {
   if (!_db) {
-    _client = createClient({ url: "file:data/portfoliost.db" })
+    const url = process.env.DATABASE_URL || "file:data/portfoliost.db"
+    _client = createClient({ url })
     _db = drizzle(_client, { schema })
   }
   return _db
