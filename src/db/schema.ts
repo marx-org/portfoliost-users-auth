@@ -1,6 +1,8 @@
-import { jsonb, pgTable, text } from "drizzle-orm/pg-core"
+import { jsonb, pgSchema, pgTable, text } from "drizzle-orm/pg-core"
 
-export const userPreferences = pgTable("user_preferences", {
+export const usersAuthSchema = pgSchema("users_auth")
+
+export const userPreferences = usersAuthSchema.table("user_preferences", {
   userId: text("user_id").primaryKey(),
   language: text("language").default("en"),
   uiPreferences: jsonb("ui_preferences"),

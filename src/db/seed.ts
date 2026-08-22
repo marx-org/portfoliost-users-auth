@@ -6,13 +6,13 @@ export async function seed(dbUrl: string, seedDir: string) {
   const sql = postgres(dbUrl, { max: 1 })
 
   try {
-    const rows = await sql`SELECT COUNT(*)::int AS count FROM user_preferences`
+    const rows = await sql`SELECT COUNT(*)::int AS count FROM users_auth.user_preferences`
     if (rows[0].count > 0) {
-      console.log(`user_preferences has ${rows[0].count} row(s), skipping seed`)
+      console.log(`users_auth.user_preferences has ${rows[0].count} row(s), skipping seed`)
       return false
     }
 
-    console.log("user_preferences is empty, running seed...")
+    console.log("users_auth.user_preferences is empty, running seed...")
 
     const files = (await readdir(seedDir)).filter((f) => f.endsWith(".sql")).sort()
     for (const file of files) {
