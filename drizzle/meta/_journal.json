@@ -8,6 +8,13 @@
       "when": 1787347738052,
       "tag": "0000_burly_talon",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1787435472379,
+      "tag": "0001_users_auth_schema_move",
+      "breakpoints": true
     }
   ]
 }

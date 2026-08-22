@@ -2,6 +2,10 @@ FROM node:22-alpine
 
 WORKDIR /app
 
+# APP_VERSION is passed by CI (release tag); falls back to package.json at runtime
+ARG APP_VERSION=""
+ENV APP_VERSION=${APP_VERSION}
+
 COPY package.json package-lock.json ./
 RUN npm ci
 

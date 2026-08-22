@@ -25,3 +25,57 @@ describe("GET /api/doc", () => {
     expect(doc.paths["/users/account"]).toBeDefined()
   })
 })
+
+describe("GET /__meta", () => {
+  it("returns module identity per D4", async () => {
+    const res = await app.request("/__meta")
+    expect(res.status).toBe(200)
+    const meta = await res.json()
+    expect(meta.service).toBe("users-auth")
+    expect(meta.impl).toBe("real")
+    expect(typeof meta.version).toBe("string")
+    expect(meta.version.length).toBeGreaterThan(0)
+  })
+})
+
+describe("GET /internal/verify", () => {
+  it("rejects missing bearer token with 401", async () => {
+    const res = await app.request("/internal/verify")
+    expect(res.status).toBe(401)
+  })
+
+  it("rejects invalid bearer token with 401", async () => {
+    const res = await app.request("/internal/verify", {
+      headers: { Authorization: "Bearer not-a-jwt" },
+    })
+    expect(res.status).toBe(401)
+  })
+
+  it("returns 204 for a token signed by the issuer", async () => {
+    const issuer = "http://users-auth-jwks.test"
+    process.env.POCKETID_ISSUER_URL = issuer
+    process.env.POCKETID_AUDIENCE = "test-audience"
+    const { SignJWT, generateKeyPair, exportJWK } = await import("jose")
+    const alg = "ES256"
+    const { publicKey, privateKey } = await generateKeyPair(alg)
+    const jwks = { keys: [{ ...(await exportJWK(publicKey)), kid: "test-key", alg, use: "sig" }] }
+    const origFetch = globalThis.fetch
+    globalThis.fetch = (async () =>
+      new Response(JSON.stringify(jwks), { headers: { "content-type": "application/json" } })) as typeof fetch
+    try {
+      const token = await new SignJWT({ email: "t@example.com" })
+        .setProtectedHeader({ alg, kid: "test-key" })
+        .setSubject("user-1")
+        .setIssuer(issuer)
+        .setAudience("test-audience")
+        .setExpirationTime("5m")
+        .sign(privateKey)
+      const res = await app.request("/internal/verify", {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      expect(res.status).toBe(204)
+    } finally {
+      globalThis.fetch = origFetch
+    }
+  })
+})
