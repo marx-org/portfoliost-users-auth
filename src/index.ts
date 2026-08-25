@@ -2,6 +2,7 @@ import { Hono } from "hono"
 import { logger } from "hono/logger"
 import { createUsersRoutes } from "./routes/users.js"
 import { createAuthRoutes } from "./routes/auth.js"
+import { createAdminRoutes } from "./routes/admin.js"
 import { createDoc } from "./doc.js"
 import { validateJwt } from "./auth.js"
 import { moduleMeta } from "./meta.js"
@@ -21,6 +22,8 @@ app.get("/internal/verify", validateJwt, (c) => c.body(null, 204))
 const api = new Hono()
 api.route("/auth", createAuthRoutes())
 api.route("/users", createUsersRoutes())
+// D48 — admin-facing users list endpoint
+api.route("/users/admin", createAdminRoutes())
 
 const doc = createDoc(api)
 
