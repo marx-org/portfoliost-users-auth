@@ -92,6 +92,12 @@ export function createAuthRoutes(db?: DB) {
       const email = idPayload.email || ""
       const firstName = idPayload.given_name || ""
       const lastName = idPayload.family_name || ""
+      // D45/D50 — groups gate the admin surface; PocketID emits string[]
+      // under claim "groups" when the "groups" scope is granted.
+      const rawGroups = idPayload.groups
+      const groups: string[] = Array.isArray(rawGroups)
+        ? rawGroups.map((g) => (typeof g === "string" ? g : String((g as { name?: string })?.name ?? g))).filter(Boolean)
+        : []
 
       await getOrCreatePreferences(db, userId)
 
@@ -104,6 +110,7 @@ export function createAuthRoutes(db?: DB) {
           email,
           firstName,
           lastName,
+          groups,
           language: "en",
           role: "user",
           isDemoUser: false,
