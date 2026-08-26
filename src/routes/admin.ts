@@ -25,14 +25,14 @@ export function createAdminRoutes(db?: DB) {
 
     const offset = (page - 1) * perPage
     const rows = await d.execute(
-      sql`SELECT user_id, created_at, updated_at FROM users_auth.user_preferences
+      sql`SELECT user_id, last_login, created_at, updated_at FROM users_auth.user_preferences
           ${where ? sql`WHERE ${where}` : sql``}
           ORDER BY user_id
           LIMIT ${perPage} OFFSET ${offset}`
     )
     const items = (Array.isArray(rows) ? rows : (rows as unknown as { rows: Record<string, unknown>[] }).rows).map((r) => ({
       userId: String(r.user_id),
-      lastLogin: null,
+      lastLogin: r.last_login ? String(r.last_login) : null,
       createdAt: String(r.created_at),
     }))
 

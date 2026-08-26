@@ -1,0 +1,1 @@
+ALTER TABLE "users_auth"."user_preferences" ADD COLUMN "last_login" text;

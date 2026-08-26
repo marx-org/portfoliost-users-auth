@@ -10,6 +10,7 @@ export const userPreferences = usersAuthSchema.table("user_preferences", {
   customTimeframes: jsonb("custom_timeframes").default([]),
   onboardingStatus: jsonb("onboarding_status").default({ completed: false }),
   onboardingDraft: jsonb("onboarding_draft").default({ draft: null }),
+  lastLogin: text("last_login"),
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
 })
