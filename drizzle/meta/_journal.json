@@ -15,6 +15,13 @@
       "when": 1787435472379,
       "tag": "0001_users_auth_schema_move",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1787702140253,
+      "tag": "0002_identity_columns",
+      "breakpoints": true
     }
   ]
 }

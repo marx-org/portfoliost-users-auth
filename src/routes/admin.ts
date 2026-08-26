@@ -2,7 +2,7 @@ import { Hono } from "hono"
 import { userIdentityMiddleware, requireGroup } from "../auth.js"
 import { getDb, type DB } from "../db/index.js"
 import { userPreferences } from "../db/schema.js"
-import { sql, asc, like, count } from "drizzle-orm"
+import { sql, like, or } from "drizzle-orm"
 
 export function createAdminRoutes(db?: DB) {
   const admin = new Hono()
@@ -14,7 +14,11 @@ export function createAdminRoutes(db?: DB) {
     const perPage = Math.min(200, Math.max(1, parseInt(c.req.query("per_page") ?? "50", 10)))
     const search = c.req.query("search")
 
-    const where = search ? like(userPreferences.userId, `${search}%`) : undefined
+    // D48b amendment: identity columns are persisted at token exchange,
+    // so this returns the full admin surface payload with no OIDC calls.
+    const where = search
+      ? or(like(userPreferences.userId, `${search}%`), like(userPreferences.email, `%${search}%`))
+      : undefined
 
     const countResult = await d.execute(
       sql`SELECT COUNT(*) as count FROM users_auth.user_preferences ${where ? sql`WHERE ${where}` : sql``}`
@@ -24,20 +28,24 @@ export function createAdminRoutes(db?: DB) {
     const totalPages = Math.ceil(total / perPage)
 
     const offset = (page - 1) * perPage
-    const rows = await d.execute(
-      sql`SELECT user_id, created_at, updated_at FROM users_auth.user_preferences
-          ${where ? sql`WHERE ${where}` : sql``}
-          ORDER BY user_id
-          LIMIT ${perPage} OFFSET ${offset}`
-    )
-    const items = (Array.isArray(rows) ? rows : (rows as unknown as { rows: Record<string, unknown>[] }).rows).map((r) => ({
-      userId: String(r.user_id),
-      lastLogin: null,
-      createdAt: String(r.created_at),
-    }))
+    const rows = await d
+      .select({
+        userId: userPreferences.userId,
+        email: userPreferences.email,
+        firstName: userPreferences.firstName,
+        lastName: userPreferences.lastName,
+        groups: userPreferences.groups,
+        lastLogin: userPreferences.lastLogin,
+        createdAt: userPreferences.createdAt,
+      })
+      .from(userPreferences)
+      .where(where)
+      .orderBy(userPreferences.userId)
+      .limit(perPage)
+      .offset(offset)
 
     return c.json({
-      items,
+      items: rows,
       pagination: { total, page, per_page: perPage, total_pages: totalPages },
     })
   })
