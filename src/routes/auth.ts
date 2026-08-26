@@ -53,18 +53,22 @@ async function exchangeWithPocketID(req: TokenExchangeRequest): Promise<PocketID
   return response.json()
 }
 
-async function getOrCreatePreferences(db: DB, userId: string) {
+// D48b amendment — persist the identity snapshot from the id_token and
+// stamp lastLogin on every exchange, so the admin surface needs no
+// per-user OIDC calls (client-credentials tokens have no user subject).
+async function upsertIdentity(
+  db: DB,
+  userId: string,
+  identity: { email: string; firstName: string; lastName: string; groups: string[] },
+) {
   const now = new Date().toISOString()
   await db
     .insert(userPreferences)
-    .values({ userId, createdAt: now, updatedAt: now })
-    .onConflictDoNothing()
-
-  const rows = await db
-    .select()
-    .from(userPreferences)
-    .where(eq(userPreferences.userId, userId))
-  return rows[0]
+    .values({ userId, ...identity, lastLogin: now, createdAt: now, updatedAt: now })
+    .onConflictDoUpdate({
+      target: userPreferences.userId,
+      set: { ...identity, lastLogin: now, updatedAt: now },
+    })
 }
 
 export function createAuthRoutes(db?: DB) {
@@ -99,7 +103,7 @@ export function createAuthRoutes(db?: DB) {
         ? rawGroups.map((g) => (typeof g === "string" ? g : String((g as { name?: string })?.name ?? g))).filter(Boolean)
         : []
 
-      await getOrCreatePreferences(db, userId)
+      await upsertIdentity(db, userId, { email, firstName, lastName, groups })
 
       return c.json({
         access_token: tokenResponse.id_token,
@@ -131,7 +135,12 @@ export function createAuthRoutes(db?: DB) {
           groups: ["portfoliost_admin"],
         }
 
-        await getOrCreatePreferences(db, mockUser.id)
+        await upsertIdentity(db, mockUser.id, {
+          email: mockUser.email,
+          firstName: mockUser.firstName,
+          lastName: mockUser.lastName,
+          groups: mockUser.groups,
+        })
 
         return c.json({
           access_token: "dev-mock-token-" + Date.now(),
