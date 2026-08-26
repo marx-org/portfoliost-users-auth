@@ -101,6 +101,12 @@ export function createAuthRoutes(db?: DB) {
 
       await getOrCreatePreferences(db, userId)
 
+      const now = new Date().toISOString()
+      await db
+        .update(userPreferences)
+        .set({ lastLogin: now })
+        .where(eq(userPreferences.userId, userId))
+
       return c.json({
         access_token: tokenResponse.id_token,
         token_type: tokenResponse.token_type,
