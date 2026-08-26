@@ -10,14 +10,6 @@ export const userPreferences = usersAuthSchema.table("user_preferences", {
   customTimeframes: jsonb("custom_timeframes").default([]),
   onboardingStatus: jsonb("onboarding_status").default({ completed: false }),
   onboardingDraft: jsonb("onboarding_draft").default({ draft: null }),
-  // Identity snapshot from the OIDC id_token, refreshed on every login
-  // (admin-module D48b amendment: persisted here instead of per-user
-  // OIDC UserInfo calls — client-credentials tokens have no user subject).
-  email: text("email"),
-  firstName: text("first_name"),
-  lastName: text("last_name"),
-  groups: jsonb("groups").$type<string[]>(),
-  lastLogin: text("last_login"),
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
 })
