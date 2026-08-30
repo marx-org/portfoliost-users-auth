@@ -139,6 +139,11 @@ export function createAuthRoutes(db?: DB) {
 
         await getOrCreatePreferences(db, mockUser.id)
 
+        await db
+          .update(userPreferences)
+          .set({ lastLogin: new Date().toISOString() })
+          .where(eq(userPreferences.userId, mockUser.id))
+
         return c.json({
           access_token: "dev-mock-token-" + Date.now(),
           token_type: "Bearer",
