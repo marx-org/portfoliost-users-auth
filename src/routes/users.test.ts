@@ -42,6 +42,7 @@ describe("Users Routes", () => {
       expect(body.lastName).toBe("User")
       expect(body.language).toBe("en")
       expect(body.isDemoUser).toBe(false)
+      expect(body.recentSearches).toEqual([])
     })
 
     it("returns 401 without identity headers", async () => {
@@ -72,6 +73,17 @@ describe("Users Routes", () => {
       const body = await res.json()
       expect(body.firstName).toBe("Test")
       expect(body.email).toBe("test@example.com")
+    })
+
+    it("updates recentSearches as an LRU queue", async () => {
+      const res = await app.request("/api/users/profile", {
+        method: "PATCH",
+        headers: { ...headers, "Content-Type": "application/json" },
+        body: JSON.stringify({ recentSearches: ["MSFT", "AAPL"] }),
+      })
+      expect(res.status).toBe(200)
+      const body = await res.json()
+      expect(body.recentSearches).toEqual(["MSFT", "AAPL"])
     })
   })
 

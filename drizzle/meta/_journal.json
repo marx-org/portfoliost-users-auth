@@ -29,6 +29,13 @@
       "when": 1787728592968,
       "tag": "0003_add_last_login",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1788199148236,
+      "tag": "0004_add_recent_searches",
+      "breakpoints": true
     }
   ]
 }

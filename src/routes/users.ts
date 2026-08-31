@@ -77,6 +77,7 @@ export function createUsersRoutes(db?: DB) {
         createdAt: prefs.createdAt,
         updatedAt: prefs.updatedAt,
         isDemoUser: false,
+        recentSearches: prefs.recentSearches ?? [],
       })
     }
   )
@@ -105,8 +106,9 @@ export function createUsersRoutes(db?: DB) {
 
       await getOrCreatePreferences(d, identity.id)
 
-      const allowedFields: Record<string, string> = {}
+      const allowedFields: Record<string, unknown> = {}
       if (body.language !== undefined) allowedFields.language = body.language
+      if (body.recentSearches !== undefined) allowedFields.recentSearches = body.recentSearches
 
       if (Object.keys(allowedFields).length > 0) {
         allowedFields.updatedAt = now
@@ -129,6 +131,7 @@ export function createUsersRoutes(db?: DB) {
         createdAt: prefs.createdAt,
         updatedAt: prefs.updatedAt,
         isDemoUser: false,
+        recentSearches: prefs.recentSearches ?? [],
       })
     }
   )
