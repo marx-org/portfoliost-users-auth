@@ -11,10 +11,12 @@ export const UserProfileSchema = z.object({
   createdAt: z.string(),
   updatedAt: z.string(),
   isDemoUser: z.boolean(),
+  recentSearches: z.array(z.string()).optional(),
 })
 
 export const UpdateProfileRequestSchema = z.object({
   language: z.string().optional(),
+  recentSearches: z.array(z.string()).max(10).optional(),
 })
 
 export const UserPreferencesSchema = z.object({
