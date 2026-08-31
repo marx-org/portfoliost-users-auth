@@ -4,6 +4,7 @@ import { openApi } from "hono-zod-openapi"
 import { getDb, type DB } from "../db/index.js"
 import { userPreferences } from "../db/schema.js"
 import { userIdentityMiddleware } from "../auth.js"
+import type { components } from "../generated/api-types.js"
 import {
   UserProfileSchema,
   UpdateProfileRequestSchema,
@@ -15,6 +16,9 @@ import {
   OnboardingDraftSchema,
   ErrorResponseSchema,
 } from "../schemas/users.js"
+
+type UserProfile = components["schemas"]["UserProfile"]
+type UserPreferences = components["schemas"]["UserPreferences"]
 
 function parseJson<T>(value: unknown, fallback: T): T {
   if (value === null || value === undefined) return fallback
@@ -77,8 +81,8 @@ export function createUsersRoutes(db?: DB) {
         createdAt: prefs.createdAt,
         updatedAt: prefs.updatedAt,
         isDemoUser: false,
-        recentSearches: prefs.recentSearches ?? [],
-      })
+        recentSearches: (prefs.recentSearches as string[] | null) ?? [],
+      } satisfies UserProfile)
     }
   )
 
@@ -131,8 +135,8 @@ export function createUsersRoutes(db?: DB) {
         createdAt: prefs.createdAt,
         updatedAt: prefs.updatedAt,
         isDemoUser: false,
-        recentSearches: prefs.recentSearches ?? [],
-      })
+        recentSearches: (prefs.recentSearches as string[] | null) ?? [],
+      } satisfies UserProfile)
     }
   )
 
@@ -157,10 +161,10 @@ export function createUsersRoutes(db?: DB) {
       return c.json({
         id: prefs.userId,
         userId: prefs.userId,
-        uiPreferences: parseJson(prefs.uiPreferences, {}),
+        uiPreferences: parseJson<Record<string, unknown>>(prefs.uiPreferences, {}),
         createdAt: prefs.createdAt,
         updatedAt: prefs.updatedAt,
-      })
+      } satisfies UserPreferences)
     }
   )
 
@@ -201,10 +205,10 @@ export function createUsersRoutes(db?: DB) {
       return c.json({
         id: prefs.userId,
         userId: prefs.userId,
-        uiPreferences: parseJson(prefs.uiPreferences, {}),
+        uiPreferences: parseJson<Record<string, unknown>>(prefs.uiPreferences, {}),
         createdAt: prefs.createdAt,
         updatedAt: prefs.updatedAt,
-      })
+      } satisfies UserPreferences)
     }
   )
 

@@ -2,7 +2,11 @@ import { Hono } from "hono"
 import { userIdentityMiddleware, requireGroup } from "../auth.js"
 import { getDb, type DB } from "../db/index.js"
 import { userPreferences } from "../db/schema.js"
-import { sql, asc, like, count } from "drizzle-orm"
+import { sql, like, count } from "drizzle-orm"
+import type { components } from "../generated/api-types.js"
+
+type AdminUserListEntry = { userId: string; lastLogin: string | null; createdAt: string }
+type AdminUserListResponse = { items: AdminUserListEntry[]; pagination: components["schemas"]["AdminUserListResponse"]["pagination"] }
 
 export function createAdminRoutes(db?: DB) {
   const admin = new Hono()
@@ -39,7 +43,7 @@ export function createAdminRoutes(db?: DB) {
     return c.json({
       items,
       pagination: { total, page, per_page: perPage, total_pages: totalPages },
-    })
+    } satisfies AdminUserListResponse)
   })
 
   return admin
