@@ -3,6 +3,11 @@ import { eq } from "drizzle-orm"
 import { userIdentityMiddleware } from "../auth.js"
 import { getDb, type DB } from "../db/index.js"
 import { userPreferences } from "../db/schema.js"
+import type { components } from "../generated/api-types.js"
+
+type AuthResponse = components["schemas"]["AuthResponse"]
+type AuthUser = components["schemas"]["AuthUser"]
+type MeResponse = components["schemas"]["MeResponse"]
 
 interface TokenExchangeRequest {
   code: string
@@ -114,8 +119,6 @@ export function createAuthRoutes(db?: DB) {
         user: {
           id: userId,
           email,
-          firstName,
-          lastName,
           groups,
           language: "en",
           role: "user",
@@ -123,7 +126,7 @@ export function createAuthRoutes(db?: DB) {
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         },
-      })
+      } satisfies AuthResponse)
     } catch (error) {
       console.error("Token exchange error:", error)
       // If PocketID is not configured, return a mock response for development
@@ -151,15 +154,13 @@ export function createAuthRoutes(db?: DB) {
           user: {
             id: mockUser.id,
             email: mockUser.email,
-            firstName: mockUser.firstName,
-            lastName: mockUser.lastName,
             language: "en",
             role: "user",
             isDemoUser: false,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
           },
-        })
+        } satisfies AuthResponse)
       }
 
       return c.json({ error: "Unauthorized", message: "Token exchange failed" }, 401)
@@ -170,12 +171,17 @@ export function createAuthRoutes(db?: DB) {
   router.get("/me", userIdentityMiddleware, async (c) => {
     const identity = c.get("userIdentity")
     return c.json({
-      id: identity.id,
-      email: identity.email,
-      firstName: identity.firstName,
-      lastName: identity.lastName,
-      groups: identity.groups,
-    })
+      user: {
+        id: identity.id,
+        email: identity.email,
+        groups: identity.groups,
+        language: "en",
+        role: "user",
+        isDemoUser: false,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+    } satisfies MeResponse)
   })
 
   // POST /api/auth/logout - Client-side logout (just clears session)
