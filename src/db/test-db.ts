@@ -9,6 +9,6 @@ export const migrationsFolder = fileURLToPath(new URL("../../drizzle", import.me
 export async function createTestDb() {
   const client = new PGlite()
   const db = drizzle(client, { schema })
-  await migrate(db, { migrationsFolder })
+  await migrate(db, { migrationsFolder, migrationsSchema: "drizzle_users_auth" })
   return { db, client }
 }

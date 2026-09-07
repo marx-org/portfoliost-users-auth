@@ -1,1 +1,0 @@
-ALTER TABLE "users_auth"."user_preferences" ADD COLUMN "recent_searches" jsonb DEFAULT '[]'::jsonb;

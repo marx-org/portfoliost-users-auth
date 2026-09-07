@@ -1,12 +1,12 @@
 {
-  "id": "63061e8d-1e29-4411-9f18-ffc05f225dd4",
+  "id": "cd3254e2-dbfe-482c-a29c-65eb9c35c175",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
-    "public.user_preferences": {
+    "users_auth.user_preferences": {
       "name": "user_preferences",
-      "schema": "",
+      "schema": "users_auth",
       "columns": {
         "user_id": {
           "name": "user_id",
@@ -55,6 +55,19 @@
           "notNull": false,
           "default": "'{\"draft\":null}'::jsonb"
         },
+        "recent_searches": {
+          "name": "recent_searches",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'[]'::jsonb"
+        },
+        "last_login": {
+          "name": "last_login",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "text",
@@ -78,7 +91,9 @@
     }
   },
   "enums": {},
-  "schemas": {},
+  "schemas": {
+    "users_auth": "users_auth"
+  },
   "sequences": {},
   "roles": {},
   "policies": {},
