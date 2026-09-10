@@ -1,15 +1,29 @@
 import { Hono } from "hono"
-import { logger } from "hono/logger"
+import { pino } from "pino"
 import { createUsersRoutes } from "./routes/users.js"
 import { createAuthRoutes } from "./routes/auth.js"
 import { createAdminRoutes } from "./routes/admin.js"
 import { createDoc } from "./doc.js"
 import { validateJwt } from "./auth.js"
 import { moduleMeta } from "./meta.js"
+import { metricsRouteHandler } from "./instrumentation.js"
 
 const app = new Hono()
 
-app.use("*", logger())
+const log = pino({ base: { service: "portfoliost-users-auth" } })
+app.use("*", async (c, next) => {
+  const start = Date.now()
+  await next()
+  log.info({
+    method: c.req.method,
+    path: c.req.path,
+    status: c.res.status,
+    duration_ms: Date.now() - start,
+    request_id: c.req.header("x-request-id") ?? undefined,
+  })
+})
+
+app.get("/metrics", metricsRouteHandler)
 
 app.get("/health", (c) => c.json({ status: "ok" }))
 
