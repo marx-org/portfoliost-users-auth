@@ -17,13 +17,19 @@ export const userPreferences = usersAuthSchema.table("user_preferences", {
 })
 
 /**
- * A live OIDC session: PocketID's 30-day refresh token, held hashed, keyed by
- * the `jti` of the id_token the browser is currently holding (§77.2).
+ * A live OIDC session: PocketID's 30-day refresh token, keyed by the `jti` of
+ * the id_token the browser is currently holding (§77.2).
  *
  * The refresh token never leaves this process. Every refresh re-keys the row to
- * the newly issued id_token's `jti` and stores its new hash, because
- * PocketID consumes the old refresh token server-side — a replay of the
- * previous `jti` must find nothing.
+ * the newly issued id_token's `jti`, because PocketID consumes the old refresh
+ * token server-side — a replay of the previous `jti` must find nothing.
+ *
+ * `refreshToken` is stored in the clear because the refresh grant has to send
+ * it verbatim to PocketID, and a hash cannot be exchanged. That is acceptable
+ * only because the value is useless to anyone who cannot already read this
+ * database: they could read the portfolios, transactions and positions
+ * directly. It is scoped to this one OIDC client, and disabling the user
+ * revokes it. Do not extend this table to hold anything more sensitive.
  *
  * `userId` is a plain column, not a foreign key to `user_preferences`: those
  * rows are auto-provisioned at login and can be deleted by
@@ -36,8 +42,7 @@ export const refreshSessions = usersAuthSchema.table(
   {
     idTokenJti: text("id_token_jti").primaryKey(),
     userId: text("user_id").notNull(),
-    /** sha256 hex of the PocketID refresh token. Never the token itself. */
-    refreshTokenHash: text("refresh_token_hash").notNull(),
+    refreshToken: text("refresh_token").notNull(),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
   },

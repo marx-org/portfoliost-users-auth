@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest"
 import { Hono } from "hono"
 import { eq } from "drizzle-orm"
-import { createHash } from "node:crypto"
+
 import { createAuthRoutes } from "./auth.js"
 import { refreshSessions } from "../db/schema.js"
 import { createTestDb } from "../db/test-db.js"
@@ -159,11 +159,10 @@ describe("Auth Routes", () => {
           .where(eq(refreshSessions.idTokenJti, "jti-abc"))
         expect(rows).toHaveLength(1)
         expect(rows[0].userId).toBe("user-42")
-        // Plaintext is never persisted.
-        expect(rows[0].refreshTokenHash).not.toBe(REFRESH)
-        expect(rows[0].refreshTokenHash).toBe(
-          createHash("sha256").update(REFRESH).digest("hex")
-        )
+        // Stored in the clear on purpose — the refresh grant must be able to
+        // replay it verbatim to PocketID. What must not leak is the HTTP
+        // response, asserted above.
+        expect(rows[0].refreshToken).toBe(REFRESH)
       } finally {
         globalThis.fetch = origFetch
         delete process.env.POCKETID_TOKEN_URL

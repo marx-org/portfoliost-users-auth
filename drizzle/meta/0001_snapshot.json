@@ -1,5 +1,5 @@
 {
-  "id": "5a54a974-8b3c-4f55-a7ee-d50ca019f8da",
+  "id": "bc9d7204-9904-4354-81a2-80d64fd47cd9",
   "prevId": "cd3254e2-dbfe-482c-a29c-65eb9c35c175",
   "version": "7",
   "dialect": "postgresql",
@@ -20,8 +20,8 @@
           "primaryKey": false,
           "notNull": true
         },
-        "refresh_token_hash": {
-          "name": "refresh_token_hash",
+        "refresh_token": {
+          "name": "refresh_token",
           "type": "text",
           "primaryKey": false,
           "notNull": true
