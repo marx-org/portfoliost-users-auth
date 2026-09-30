@@ -1,8 +1,9 @@
 import { Hono } from "hono"
 import { eq } from "drizzle-orm"
+import { createHash } from "node:crypto"
 import { userIdentityMiddleware } from "../auth.js"
 import { getDb, type DB } from "../db/index.js"
-import { userPreferences } from "../db/schema.js"
+import { refreshSessions, userPreferences } from "../db/schema.js"
 import type { components } from "../generated/api-types.js"
 
 type AuthResponse = components["schemas"]["AuthResponse"]
@@ -20,6 +21,67 @@ interface PocketIDTokenResponse {
   token_type: string
   expires_in: number
   id_token: string
+  refresh_token?: string
+}
+
+/**
+ * sha256 hex of a refresh token. PocketID stores refresh tokens hashed the same
+ * way, so if this table ever leaks it holds no usable credential.
+ */
+export function hashRefreshToken(token: string): string {
+  return createHash("sha256").update(token).digest("hex")
+}
+
+/** JWT payload shape of the Pocket-ID id_token. */
+interface IdTokenClaims {
+  sub?: string
+  jti?: string
+  email?: string
+  given_name?: string
+  family_name?: string
+  groups?: unknown
+}
+
+function decodeIdTokenPayload(idToken: string): IdTokenClaims {
+  const parts = idToken.split(".")
+  if (parts.length < 2) throw new Error("Malformed id_token")
+  return JSON.parse(Buffer.from(parts[1], "base64url").toString()) as IdTokenClaims
+}
+
+/** PocketID emits string[] under "groups" when the "groups" scope is granted. */
+function toGroups(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return []
+  return raw
+    .map((g) => (typeof g === "string" ? g : String((g as { name?: string })?.name ?? g)))
+    .filter(Boolean)
+}
+
+/**
+ * Persist the refresh token against the id_token the browser is about to hold,
+ * keyed by that token's `jti` (§77.2). A missing refresh_token or jti is not an
+ * error — it just means the browser gets no long-lived session and must
+ * re-authenticate at expiry, exactly as it does today.
+ */
+async function persistRefreshSession(
+  db: DB,
+  idTokenClaims: IdTokenClaims,
+  refreshToken: string | undefined
+): Promise<void> {
+  if (!refreshToken || !idTokenClaims.jti || !idTokenClaims.sub) return
+  const now = new Date().toISOString()
+  await db
+    .insert(refreshSessions)
+    .values({
+      idTokenJti: idTokenClaims.jti,
+      userId: idTokenClaims.sub,
+      refreshTokenHash: hashRefreshToken(refreshToken),
+      createdAt: now,
+      updatedAt: now,
+    })
+    .onConflictDoUpdate({
+      target: refreshSessions.idTokenJti,
+      set: { refreshTokenHash: hashRefreshToken(refreshToken), updatedAt: now },
+    })
 }
 
 async function exchangeWithPocketID(req: TokenExchangeRequest): Promise<PocketIDTokenResponse> {
@@ -90,19 +152,16 @@ export function createAuthRoutes(db?: DB) {
       const db = getDbInstance()
 
       // Decode id_token to extract real user claims
-      const idParts = tokenResponse.id_token.split(".")
-      const idPayload = JSON.parse(Buffer.from(idParts[1], "base64url").toString())
+      const idClaims = decodeIdTokenPayload(tokenResponse.id_token)
 
-      const userId = idPayload.sub
-      const email = idPayload.email || ""
-      const firstName = idPayload.given_name || ""
-      const lastName = idPayload.family_name || ""
+      const userId = idClaims.sub
+      if (!userId) throw new Error("id_token has no sub claim")
+      const email = idClaims.email || ""
+      const firstName = idClaims.given_name || ""
+      const lastName = idClaims.family_name || ""
       // D45/D50 — groups gate the admin surface; PocketID emits string[]
       // under claim "groups" when the "groups" scope is granted.
-      const rawGroups = idPayload.groups
-      const groups: string[] = Array.isArray(rawGroups)
-        ? rawGroups.map((g) => (typeof g === "string" ? g : String((g as { name?: string })?.name ?? g))).filter(Boolean)
-        : []
+      const groups = toGroups(idClaims.groups)
 
       await getOrCreatePreferences(db, userId)
 
@@ -111,6 +170,11 @@ export function createAuthRoutes(db?: DB) {
         .update(userPreferences)
         .set({ lastLogin: now })
         .where(eq(userPreferences.userId, userId))
+
+      // §77.2 — keep the 30-day refresh token server-side instead of
+      // discarding it. The HTTP response is unchanged, so no refresh token
+      // ever reaches the browser.
+      await persistRefreshSession(db, idClaims, tokenResponse.refresh_token)
 
       return c.json({
         access_token: tokenResponse.id_token,
