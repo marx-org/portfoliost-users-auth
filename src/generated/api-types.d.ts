@@ -72,6 +72,35 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Exchange an expired session for a fresh token
+         * @description Rotates the server-side refresh session identified by the submitted
+         *     token's `jti` and returns a new one.
+         *
+         *     The refresh token never leaves the backend: it is held hashed, keyed by
+         *     the `jti` of the id_token handed to the client, and re-keyed to the new
+         *     `jti` on every call. Rotation is mandatory — the old token is consumed,
+         *     so replaying a previously used id_token fails with 401.
+         *
+         *     Callers must serialise this: concurrent 401s should share one in-flight
+         *     refresh, or all but the first will fail.
+         */
+        post: operations["refresh"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/users/profile": {
         parameters: {
             query?: never;
@@ -1072,6 +1101,25 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/portfolios/{id}/recompute": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["portfolioId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Force-rebuild portfolio history (delete + rebuild value snapshots) */
+        post: operations["portfolioRecompute"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/portfolios/{id}/positions": {
         parameters: {
             query?: never;
@@ -1400,20 +1448,170 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/wallets/{walletId}/transactions/{transactionId}/labels": {
+    "/portfolios/{id}/cash": {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                id: components["parameters"]["walletId"];
-                transactionId: string;
+                id: components["parameters"]["portfolioId"];
+            };
+            cookie?: never;
+        };
+        /** Portfolio cash position (per-currency balances + base total) */
+        get: operations["getPortfolioCash"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolios/{id}/cash/balance-history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["portfolioId"];
+            };
+            cookie?: never;
+        };
+        /** Portfolio cash balance history (base-currency totals) */
+        get: operations["getPortfolioCashHistory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolios/{id}/cash/transactions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["portfolioId"];
+            };
+            cookie?: never;
+        };
+        /** Portfolio cash transactions (external rows only) */
+        get: operations["getPortfolioCashTransactions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolios/{id}/cash/deposits": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["portfolioId"];
             };
             cookie?: never;
         };
         get?: never;
         put?: never;
-        /** Set labels on a wallet transaction (replace semantics) */
-        post: operations["setWalletTransactionLabels"];
+        /** Deposit cash into a portfolio */
+        post: operations["depositCash"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolios/{id}/cash/withdrawals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["portfolioId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Withdraw cash from a portfolio */
+        post: operations["withdrawCash"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolios/{id}/cash/transfers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["portfolioId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Transfer cash between portfolios */
+        post: operations["transferCash"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolios/cash/recent-transactions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Recent cash transactions across all portfolios */
+        get: operations["getRecentCashTransactions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolios/cash/transactions/{txId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                txId: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete a cash transaction */
+        delete: operations["deleteCashTransaction"];
+        options?: never;
+        head?: never;
+        /** Update a cash transaction */
+        patch: operations["updateCashTransaction"];
+        trace?: never;
+    };
+    "/portfolios/cash/transactions/{txId}/labels": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                txId: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Set labels on a cash transaction (replace semantics) */
+        post: operations["setCashTransactionLabels"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1437,145 +1635,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/wallets": {
+    "/import/portfolios/bootstrap": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** List cash wallets */
-        get: operations["listWallets"];
+        get?: never;
         put?: never;
-        /** Create wallet */
-        post: operations["createWallet"];
+        /** Idempotently ensure a portfolio exists, tagged with external_source */
+        post: operations["importPortfolioBootstrap"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/wallets/total-balance": {
+    "/import/labels/bootstrap": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Total wallet balance */
-        get: operations["getWalletsTotalBalance"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/wallets/{id}/balance-history": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: components["parameters"]["walletId"];
-            };
-            cookie?: never;
-        };
-        /** Wallet balance history */
-        get: operations["getWalletBalanceHistory"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/wallets/{id}/deposits": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: components["parameters"]["walletId"];
-            };
-            cookie?: never;
-        };
         get?: never;
         put?: never;
-        /** Deposit cash */
-        post: operations["depositCash"];
+        /** Idempotently ensure labels exist by name (palette-colored when created) */
+        post: operations["importLabelBootstrap"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/wallets/{id}/withdrawals": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: components["parameters"]["walletId"];
-            };
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Withdraw cash */
-        post: operations["withdrawCash"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/wallets/{id}/transfers": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: components["parameters"]["walletId"];
-            };
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Transfer between wallets */
-        post: operations["transferCash"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/wallets/{id}/transactions": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: components["parameters"]["walletId"];
-            };
-            cookie?: never;
-        };
-        /** Cash transactions */
-        get: operations["getCashTransactions"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/wallets/recent-transactions": {
+    "/import/transactions": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Recent cash transactions across all wallets */
-        get: operations["getRecentCashTransactions"];
+        get?: never;
+        put?: never;
+        /** Submit an idempotent batch of max 500 imported transaction events */
+        post: operations["importTransactions"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/import/sync-runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List import runs for the authenticated user */
+        get: operations["listSyncRuns"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1584,24 +1703,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/wallets/transactions/{id}": {
+    "/import/sync-runs/{id}": {
         parameters: {
             query?: never;
             header?: never;
-            path: {
-                id: string;
-            };
+            path?: never;
             cookie?: never;
         };
         get?: never;
         put?: never;
         post?: never;
-        /** Delete a cash transaction */
-        delete: operations["deleteCashTransaction"];
+        /** Delete a sync run record (does not delete imported transactions) */
+        delete: operations["deleteSyncRun"];
         options?: never;
         head?: never;
-        /** Update a cash transaction */
-        patch: operations["updateCashTransaction"];
+        patch?: never;
+        trace?: never;
+    };
+    "/import/source/{externalSource}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Wipe all data tagged with this source for the authenticated user */
+        delete: operations["wipeImportSource"];
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/watchlists": {
@@ -1958,6 +2091,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/internal/apply-split": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Retroactively adjust portfolio transactions for a stock split
+         * @description No auth — reachable only inside the cluster. Recomputes quantity/price for all transactions of a symbol before the effective date from the frozen original_quantity/original_price; idempotent.
+         */
+        post: operations["applySplit"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1993,6 +2146,16 @@ export interface components {
             /** Format: email */
             email: string;
             password: string;
+        };
+        RefreshRequest: {
+            /**
+             * @description The caller's current bearer token. It is normally already expired —
+             *     that is the normal case, not an error. The signature, issuer and
+             *     audience are verified; `exp` is deliberately NOT checked, because
+             *     the token's only job here is to identify which server-side refresh
+             *     session to rotate. Never read identity claims from the raw body.
+             */
+            id_token: string;
         };
         AuthResponse: {
             access_token: string;
@@ -2222,24 +2385,45 @@ export interface components {
                 [key: string]: unknown;
             }[];
         };
+        /**
+         * @description How the instrument `currency` was determined (plan §47):
+         *     - `provider` — the upstream provider declared the currency (e.g. the
+         *       biznesradar `priceCurrency` meta tag);
+         *     - `estimated` — no provider declaration; resolved locally from the
+         *       symbol (e.g. `.TFI`/`.FIZ` → PLN) or the exchange;
+         *     - `unknown` — nothing is known; `currency` is null and must never be
+         *       silently defaulted to a code.
+         * @enum {string}
+         */
+        CurrencySource: "provider" | "estimated" | "unknown";
+        /** @enum {string} */
+        InstrumentType: "STOCK" | "ETF" | "BOND" | "CRYPTO" | "FUND" | "CORP_BOND";
         InstrumentDetail: {
             id?: string;
             symbol?: string;
             name?: string;
             exchange?: string;
-            type?: string;
-            currency?: string;
+            type?: components["schemas"]["InstrumentType"];
+            /** @description ISO-4217; null when the provider does not declare one (45.2 — never guessed) */
+            currency?: string | null;
+            /** @description How currency was determined (provider/estimated/unknown, plan §47.3) */
+            currencySource?: components["schemas"]["CurrencySource"];
         };
         InstrumentProfile: {
             ticker?: string;
             name?: string;
             country?: string | null;
             countryCode?: string | null;
+            /** @description Contract `InstrumentType` for the shared identity block (`TickerBadge`). Resolved from the local ticker reference, like `countryCode`; null when the symbol is not in it — never guessed (§61.8). */
+            assetType?: string | null;
             isin?: string | null;
-            currency?: string;
+            /** @description ISO-4217; null when the provider does not declare one (45.2 — never guessed) */
+            currency?: string | null;
             exchange?: string;
             finnhubIndustry?: string | null;
             ipo?: string | null;
+            /** @description How currency was determined (provider/estimated/unknown, plan §47.3) */
+            currencySource?: components["schemas"]["CurrencySource"];
             logo?: string | null;
             marketCapitalization?: number | null;
             marketCapCurrency?: string | null;
@@ -2352,7 +2536,10 @@ export interface components {
             ask: number;
             bidSize: number;
             askSize: number;
-            currency: string;
+            /** @description ISO-4217; null when the provider does not declare one (45.2 — never guessed) */
+            currency: string | null;
+            /** @description How currency was determined (provider/estimated/unknown, plan §47.3) */
+            currencySource?: components["schemas"]["CurrencySource"];
             regularMarketPrice: number;
             extendedHoursChange: number;
             extendedHoursChangePercent: number;
@@ -2369,12 +2556,24 @@ export interface components {
             volumes: number[];
             timestamps: number[];
             status: string;
-            currency: string;
+            /** @description ISO-4217; null when the provider does not declare one (45.2 — never guessed). PriceHistory.currency was previously non-null; plan §47 makes it nullable to match Quote/Profile. With ?currency= (plan §48.2) this is the converted output currency */
+            currency: string | null;
+            /** @description How currency was determined (provider/estimated/unknown, plan §47.3) */
+            currencySource?: components["schemas"]["CurrencySource"];
+            /** @description ISO-4217 the series is natively denominated in (resolved; null when unknown). Equals currency when no conversion was applied (plan §48.2) */
+            baseCurrency?: string | null;
+            /**
+             * Format: date
+             * @description Earliest FX rate date covering the window. §72.17 SUPERSEDES the old rule this field documented: a bar that cannot be converted is **absent from the response**, not passed through in the native baseCurrency. So when a conversion was requested this is the first row of the returned series, and the series may be shorter than the requested window. Do not reimplement the pre-§72.17 behaviour — a base-currency price under a target-currency label is how a portfolio read 85 PLN one day and ~400 the next. Null when no conversion was applied.
+             */
+            fxFrom?: string | null;
+            /** @description Dates in the REQUESTED window that were dropped because no FX rate existed for the pair (§72.10). Present only when ?currency= asked for a conversion; empty when nothing was dropped, absent when no conversion was applied. A caller can therefore tell a short series from a truncated one instead of inferring it — the gaps are scattered as well as prefixed, so `fxFrom` alone cannot express them. */
+            unconvertedDates?: string[];
         };
         SearchResult: {
             symbol?: string;
             name?: string;
-            type?: string;
+            type?: components["schemas"]["InstrumentType"];
             exchange?: string;
             countryCode?: string | null;
             source?: string;
@@ -2449,6 +2648,7 @@ export interface components {
             sumOfCurrentPositions: number;
             sumOfCurrentPositionsValue: number;
         };
+        /** @description Instrument research dividend history (`history`) OR the portfolio's own dividend rows (`totalDividends`/`count`/`items`) — see the exposing endpoint. For portfolio items, gross = quantity × price, taxes is the withholding tax, amount is the NET (gross − taxes) per the stoxly convention, and convertedAmount is amount in the display currency. The research `/dividends` endpoint always also sets `currency` + `currencySource` (plan §49.6, currency is never null); the portfolio endpoint does not. */
         DividendsData: {
             history?: {
                 date: string;
@@ -2456,28 +2656,40 @@ export interface components {
                 amount: number;
                 currency: string;
                 type: string;
+                /** @description Dividend payment date (when the provider carries it; NASDAQ does). Null when the provider only reports the ex-dividend date (e.g. yfinance) — plan §49.9. */
+                paymentDate?: string | null;
+            }[];
+            /** @description Research side only: the instrument's resolved trading currency — always set (fallback "USD" only on total uncertainty), see `currencySource` for how it was determined. */
+            currency?: string;
+            /** @description Research side only — how `currency` was determined (§47). */
+            currencySource?: components["schemas"]["CurrencySource"];
+            /** @description Sum of net dividend amounts in the display currency */
+            totalDividends?: number;
+            count?: number;
+            items?: {
+                symbol: string;
+                instrumentName?: string | null;
+                /** @description The instrument's asset class, for the shared identity block (`TickerBadge`). Nullable because the research-backed `history` shape has neither this nor `country`; the portfolio route fills both from the DIVIDEND transaction row. Never guessed. */
+                assetType?: string | null;
+                /** @description 2-letter country code of the instrument (not the transaction's currency) — see `assetType`. Null when unknown. */
+                country?: string | null;
+                date: string;
+                quantity: number;
+                gross: number;
+                taxes?: number | null;
+                amount: number;
+                currency: string;
+                exchangeRate?: number | null;
+                convertedAmount?: number | null;
+                notes?: string | null;
             }[];
         };
         CalendarData: {
             currency?: string;
-            earnings?: {
-                date: string;
-                title?: string;
-                year?: number;
-                quarter?: number;
-            }[];
-            exDividend?: {
-                date: string;
-                title?: string;
-                year?: number;
-                amount?: number;
-            }[];
-            dividend?: {
-                date: string;
-                title?: string;
-                year?: number;
-                amount?: number;
-            }[];
+            earnings?: components["schemas"]["CalendarEarningsItem"][];
+            exDividend?: components["schemas"]["CalendarExDividendItem"][];
+            dividend?: components["schemas"]["CalendarDividendItem"][];
+            holdings?: components["schemas"]["CalendarHolding"][];
             upcoming?: {
                 symbol?: string;
                 companyName?: string;
@@ -2496,6 +2708,32 @@ export interface components {
                 amount?: number | null;
                 quarter?: number | null;
             }[];
+        };
+        CalendarEarningsItem: {
+            date: string;
+            title?: string;
+            year?: number;
+            quarter?: number;
+        };
+        CalendarExDividendItem: {
+            date: string;
+            title?: string;
+            year?: number;
+            amount?: number;
+        };
+        CalendarDividendItem: {
+            date: string;
+            title?: string;
+            year?: number;
+            amount?: number;
+        };
+        CalendarHolding: {
+            symbol: string;
+            companyName?: string;
+            currency?: string;
+            earnings?: components["schemas"]["CalendarEarningsItem"][];
+            exDividend?: components["schemas"]["CalendarExDividendItem"][];
+            dividend?: components["schemas"]["CalendarDividendItem"][];
         };
         SeasonalityData: {
             symbol?: string;
@@ -2554,12 +2792,29 @@ export interface components {
             date?: string;
             price?: number;
             currency?: string;
+            /** @description ISO-4217 the price is natively denominated in (resolved; null when unknown). Equals currency when no conversion was applied (plan §48.2) */
+            baseCurrency?: string | null;
+            /**
+             * Format: date
+             * @description Date of the FX rate table used for the conversion; null when no conversion was applied (plan §48.2)
+             */
+            fxFrom?: string | null;
         };
         PriceBarSeries: {
             symbol: string;
             timeframe: string;
             stale: boolean;
-            currency?: string | null;
+            /** @description ISO-4217 currency of the closes — the native trading currency, or the ?currency= target when converted (plan §48.2) */
+            currency: string;
+            /** @description ISO-4217 the closes are natively denominated in (resolved; null when unknown). Equals currency when no conversion was applied (plan §48.2) */
+            baseCurrency?: string | null;
+            /**
+             * Format: date
+             * @description Earliest FX rate date covering the window. §72.17 SUPERSEDES the old rule this field documented: a bar that cannot be converted is **absent from the response**, not passed through in the native baseCurrency. So when a conversion was requested this is the first row of the returned series, and the series may be shorter than the requested window. Do not reimplement the pre-§72.17 behaviour — a base-currency price under a target-currency label is how a portfolio read 85 PLN one day and ~400 the next. Null when no conversion was applied.
+             */
+            fxFrom?: string | null;
+            /** @description Dates in the REQUESTED window whose bars were dropped because no FX rate existed for the pair (§72.10). Present only when ?currency= asked for a conversion; empty when nothing was dropped, absent when no conversion was applied. Lets a caller distinguish a short series from a truncated one instead of inferring it — the dropped bars are scattered as well as prefixed, so `fxFrom` alone cannot express them. */
+            unconvertedDates?: string[];
             dates: string[];
             closes: number[];
         };
@@ -2597,6 +2852,10 @@ export interface components {
         ResearchCompare: {
             symbol?: string;
             name?: string;
+            /** @description 2-letter country code for the shared identity block (`TickerBadge`). Resolved from the provider's own ticker reference; null when the symbol is not in it — never guessed (§61.4). */
+            countryCode?: string | null;
+            /** @description Contract `InstrumentType` for the identity block. Same rule as `countryCode` — null when the ticker reference has no row. */
+            assetType?: string | null;
             price?: number;
             marketCap?: number;
             peRatio?: number;
@@ -2659,9 +2918,7 @@ export interface components {
             description?: string | null;
             strategy: string;
             type: string;
-            currency: string;
-            /** Format: uuid */
-            walletId: string;
+            baseCurrency?: string;
             totalInvested: number;
             currentValue: number;
             isPublic: boolean;
@@ -2677,6 +2934,8 @@ export interface components {
                 openPositions?: number;
                 unrealizedGainLoss?: number;
             };
+            /** @description Portfolio-native cash position (plan §62) */
+            cash?: components["schemas"]["PortfolioCash"];
         };
         CreatePortfolioRequest: {
             name: string;
@@ -2685,26 +2944,144 @@ export interface components {
             currency?: string;
             isPublic?: boolean;
         };
+        /**
+         * @description The dashboard headline aggregate, all amounts in `baseCurrency`.
+         *
+         *     §68 — the four headline figures, and what `totalValue` means changed:
+         *
+         *       instrumentsValue  positions only
+         *       cashValue         the cash BALANCE (not a flow)
+         *       totalValue        instrumentsValue + cashValue
+         *       totalInvested     net external cash flow (see below)
+         *
+         *     `totalValue` previously excluded cash, which made the headline disagree
+         *     with the portfolio cards by exactly the cash balance (§63.3). It now
+         *     means the whole account.
+         */
         PortfolioTotalMetrics: {
-            totalValue?: number;
-            totalInvested?: number;
+            /** @description Open-position market value only, cash excluded, converted into baseCurrency. Σ of each position's own instrument currency at its own rate — never a raw cross-currency sum. */
+            instrumentsValue: number;
+            /** @description Cash balance across all portfolios in baseCurrency (Σ per-currency balances converted). Renamed from `totalCash` in §68 — a balance, not a flow. May be negative on a margin account, and must not be clamped. */
+            cashValue: number;
+            /** @description The whole account: instrumentsValue + cashValue. CHANGED in §68 — this used to be positions-only, which is what made the headline miss cash. */
+            totalValue: number;
+            /**
+             * @description Net external cash flow in baseCurrency: DEPOSIT − WITHDRAWAL ± TRANSFER legs, each at its own historical rate
+             *     (the §62 `externalCashInvested` basis, reported by `externalCapitalBasisSource`).
+             *
+             *     Transfers are part of this definition, not excluded. The honest
+             *     consequence: a transfer between two of the user's own portfolios
+             *     RAISES one portfolio's invested figure and LOWERS the other's. The
+             *     aggregate is unaffected because the legs net to zero, but a
+             *     per-portfolio number on this basis is not "capital you put in".
+             */
+            totalInvested: number;
+            /** @description totalValue − totalInvested. Moves with §68's change to totalValue. */
             totalGainLoss?: number;
+            /** @description totalGainLoss / totalInvested. Moves with §68's change to totalValue. */
             returnPercentage?: number;
-            baseCurrency?: string;
-            portfolioBreakdown?: {
-                id?: string;
-                name?: string;
-                totalValue?: number;
-                totalInvested?: number;
+            baseCurrency: string;
+            /** @description Per-portfolio rows. §68 — each carries the same cash/instruments split, so Σ breakdown == the headline and a card can render its own split without a second request. */
+            portfolioBreakdown: {
+                id: string;
+                name: string;
+                /** @description This portfolio's open positions only, converted into baseCurrency. */
+                instrumentsValue: number;
+                /** @description This portfolio's cash balance in baseCurrency. May be negative. */
+                cashValue: number;
+                /** @description instrumentsValue + cashValue for this portfolio. */
+                totalValue: number;
+                totalInvested: number;
                 returnPercentage?: number;
                 weight?: number;
+                /** @description Open positions with no market value */
+                unpricedPositions?: number;
+                /**
+                 * Format: date-time
+                 * @description Oldest resolved price timestamp for this portfolio's positions.
+                 */
+                priceAsOf?: string | null;
+                /** @description 'quote' or 'fallback' — whether the value is a live price or a remembered one. */
+                priceSource?: string | null;
             }[];
             externalCapitalReturnPercent?: number | null;
             externalCapitalReturnAmount?: number | null;
             externalCapitalBasis?: number | null;
+            /**
+             * @description Open positions excluded from `instrumentsValue` because no market value is known (§70).
+             *     They are NOT valued at their cost basis — a cost is not a price, and a plausible
+             *     wrong number is worse than an admitted gap. Non-zero means the pricing pipeline
+             *     has not caught up (nothing used to maintain `positions.market_value` on a schedule).
+             */
+            unpricedPositions?: number;
+            /**
+             * Format: date-time
+             * @description OLDEST resolved price timestamp across the positions included in this aggregate.
+             *     The newest quote can be minutes old while the oldest is a day old, and a total built
+             *     from mixed ages is only as fresh as its stalest input — so the headline reports the
+             *     oldest. Null when no position could be priced at all.
+             */
+            priceAsOf?: string | null;
+            /**
+             * @description Dominant price provenance — 'quote' (resolved from instruments) or 'fallback'
+             *     (a stored price reused because instruments could not be reached). 'fallback' means
+             *     the figure is a remembered price, not a current one.
+             */
+            priceSource?: string | null;
             externalCapitalBasisSource?: string | null;
             externalCapitalSuppressedReason?: string | null;
             externalCapitalReturnBasisKind?: string | null;
+            /** @description Per-currency cash summary (dashboard cash card) */
+            cashBreakdown?: {
+                currency: string;
+                balance: number;
+                /**
+                 * @description Share of GROSS cash exposure in this currency, 0–100, summing to 100 (§70.5).
+                 *     Deliberately NOT `balance / net`: IBKR holds +64,898 EUR against
+                 *     −45,434 USD, so the net nearly cancels and net-based weights explode to
+                 *     +648% / −398%. The signed `balance` still reports direction — the mixed
+                 *     signs are real (currency conversions the broker performs without recording
+                 *     them) — while the weight answers "how much of this account's cash is in this
+                 *     currency", which is well defined whatever the signs do.
+                 */
+                weight?: number | null;
+            }[];
+        };
+        /** @description Portfolio-native cash position (plan §62) — per-currency balances derived by transaction replay */
+        PortfolioCash: {
+            baseCurrency: string;
+            balances: {
+                currency: string;
+                /** @description Balance in that currency */
+                balance: number;
+            }[];
+            /** @description Base-currency total */
+            total: number;
+        };
+        /** @description Cash balance history — data[].balance is the base-currency total of all currency balances at that date */
+        PortfolioCashHistory: {
+            data: {
+                /** Format: date-time */
+                date: string;
+                balance: number;
+                change: number;
+                percentChange: number | null;
+                high: number;
+                low: number;
+            }[];
+            meta: {
+                period: string;
+                resolution: string;
+                high: number;
+                low: number;
+                average: number;
+                /** Format: date-time */
+                startDate: string;
+                /** Format: date-time */
+                endDate: string;
+                change: number;
+                percentChange?: number | null;
+            };
         };
         HeldStock: {
             symbol?: string;
@@ -2807,6 +3184,10 @@ export interface components {
         SetLabelsRequest: {
             labelIds: string[];
         };
+        BackfillRecomputeResponse: {
+            /** @enum {string} */
+            backfillStatus: "pending" | "complete" | "failed";
+        };
         PortfolioAnalytics: {
             /** @enum {string|null} */
             backfillStatus?: "pending" | "complete" | "failed" | null;
@@ -2841,6 +3222,7 @@ export interface components {
                 timeSeries?: {
                     date?: string;
                     value?: number;
+                    invested?: number | null;
                     cumulativeTwr?: number;
                     cumulativeMwr?: number;
                     cumulativeSimple?: number;
@@ -2862,9 +3244,12 @@ export interface components {
                 month?: string;
                 returnPercent?: number;
             }[];
+            gapSymbols?: string[] | null;
         };
         PortfolioSnapshot: {
             allocation?: {
+                /** @description Currency of every allocation row below except byCurrency */
+                currency?: string;
                 byAsset?: {
                     name?: string;
                     value?: number;
@@ -2889,7 +3274,9 @@ export interface components {
                     name?: string;
                     value?: number;
                 }[];
+                /** @description Each row is denominated in its OWN currency, which is its `name` as an ISO-4217 code — this is the one breakdown that is not in the allocation `currency`. */
                 byCurrency?: {
+                    /** @description ISO-4217 currency code for this row. */
                     name?: string;
                     value?: number;
                 }[];
@@ -2938,6 +3325,7 @@ export interface components {
                 externalCapitalReturnBasisKind?: string | null;
             };
             positions?: components["schemas"]["PositionSummary"][];
+            cash?: components["schemas"]["PortfolioCash"];
         };
         PositionSummary: {
             /** Format: uuid */
@@ -2970,13 +3358,19 @@ export interface components {
             instrumentAvgCostBasis: number;
         };
         PortfolioSummaryMetrics: {
+            /** @description The portfolio's base currency (ISO-4217). Every amount on this object is denominated in it. */
+            currency: string;
+            /** @description positionValue + cashValue (cash included */
             totalValue: number;
+            /** @description This portfolio's cash balance in `currency`. May be negative on a margin account. */
+            cashValue: number;
             totalInvested: number;
             simpleReturnPercent: number;
             investmentReturnPercent: number;
             currencyImpactPercent: number;
             cumulativeDividends: number;
             totalDividends: number;
+            /** @description Open-position value only */
             positionValue: number;
             realizedGain: number;
             costBasis: number;
@@ -2985,6 +3379,18 @@ export interface components {
             dayChangePercent: number;
             /** Format: date-time */
             dayChangeDate: string;
+            /**
+             * @description Open positions excluded from `totalValue` because no market value is known (§70).
+             *     They are NOT valued at their cost basis — a cost is not a price.
+             */
+            unpricedPositions?: number;
+            /**
+             * Format: date-time
+             * @description Oldest resolved price timestamp across this portfolio's open positions.
+             */
+            priceAsOf?: string | null;
+            /** @description 'quote' or 'fallback' — whether the value is a live price or a remembered one. */
+            priceSource?: string | null;
             externalCapitalReturnPercent?: number | null;
             externalCapitalReturnAmount?: number | null;
             externalCapitalBasis?: number | null;
@@ -2998,14 +3404,13 @@ export interface components {
                 issues?: Record<string, never>[];
             };
         };
+        /** @description A portfolio transaction row. For `type: DIVIDEND` the stoxly convention applies (verified against the live API 2026-09-26): `price` is the per-share gross dividend, `quantity × price` is the gross total, `taxes` is the withholding tax, and `totalAmount` is the **net** (gross − taxes). BUY/SELL rows keep `totalAmount = quantity × price + fees`. */
         Transaction: components["schemas"]["FeeFxFields"] & {
             /** Format: uuid */
             id: string;
             /** Format: uuid */
             portfolioId: string;
             portfolioName: string;
-            /** Format: uuid */
-            walletId: string;
             /** Format: uuid */
             positionId?: string | null;
             type: string;
@@ -3014,6 +3419,8 @@ export interface components {
             quantity: number;
             price: number;
             fees: number;
+            /** @description Withholding tax on a DIVIDEND (gross − taxes = net totalAmount); null otherwise */
+            taxes?: number | null;
             totalAmount: number;
             currency: string;
             priceCurrency: string;
@@ -3032,6 +3439,16 @@ export interface components {
             convertedRealizedGainLoss?: number | null;
             sector?: string;
             country?: string;
+            /** @description Import provenance tag; NULL for manually-created rows */
+            externalSource?: string | null;
+            /** @description Importer-supplied dedup key; unique per externalSource */
+            externalId?: string | null;
+            /** @description Pre-split/pre-restatement quantity; frozen at creation */
+            originalQuantity?: number | null;
+            /** @description Pre-split/pre-restatement price; frozen at creation */
+            originalPrice?: number | null;
+            /** @description Optional user note on the transaction (e.g. dividend remittance details) */
+            notes?: string | null;
             labels?: components["schemas"]["Label"][];
         };
         FeeFxFields: {
@@ -3043,7 +3460,7 @@ export interface components {
             feeCurrency?: string | null;
             /** @enum {string|null} */
             feeRateSource?: "automatic" | "manual" | null;
-            /** @description Fee-currency -> transaction/wallet-currency rate for settlement. */
+            /** @description Fee-currency -> transaction-currency rate for settlement. */
             feeExchangeRate?: number | null;
         };
         CreateTransactionRequest: components["schemas"]["FeeFxFields"] & {
@@ -3056,40 +3473,36 @@ export interface components {
             fees?: number;
             /** @enum {string} */
             feesType?: "fixed" | "pct";
+            /** @description Withholding tax on a DIVIDEND (nullable, ≥ 0). When set for `type: DIVIDEND`, totalAmount is stored net (quantity × price − taxes). */
+            taxes?: number | null;
+            /** @description Optional user note on the transaction */
+            notes?: string | null;
             /** Format: date-time */
             executedAt?: string;
+        };
+        DepositCashRequest: components["schemas"]["FeeFxFields"] & {
+            amount: number;
+            /** @description Defaults to the portfolio baseCurrency; any registry currency allowed */
+            currency?: string;
+            description?: string;
+            transactionDate?: string;
+        };
+        WithdrawCashRequest: components["schemas"]["FeeFxFields"] & {
+            amount: number;
+            /** @description Defaults to the portfolio baseCurrency; any registry currency allowed */
+            currency?: string;
+            description?: string;
+            transactionDate?: string;
+            paymentMethod?: string;
+        };
+        TransferCashRequest: components["schemas"]["FeeFxFields"] & {
+            amount: number;
+            currency: string;
+            description?: string;
+            transactionDate?: string;
             /** Format: uuid */
-            walletId?: string;
-        };
-        DepositRequest: components["schemas"]["FeeFxFields"] & {
-            amount?: number;
-            currency?: string;
-            description?: string;
-            transaction_date?: string;
-            fees?: number;
-            /** @enum {string} */
-            fees_type?: "fixed" | "pct";
-        };
-        WithdrawRequest: components["schemas"]["FeeFxFields"] & {
-            amount?: number;
-            currency?: string;
-            description?: string;
-            transaction_date?: string;
-            payment_method?: string;
-            fees?: number;
-            /** @enum {string} */
-            fees_type?: "fixed" | "pct";
-        };
-        TransferRequest: components["schemas"]["FeeFxFields"] & {
-            amount?: number;
-            currency?: string;
-            description?: string;
-            transfer_date?: string;
-            /** Format: uuid */
-            to_wallet_id?: string;
-            fees?: number;
-            /** @enum {string} */
-            fees_type?: "fixed" | "pct";
+            toPortfolioId: string;
+            /** @description D22 elastic target leg; server-computed when omitted */
             targetAmount?: number | null;
             targetFxRate?: number | null;
         };
@@ -3104,63 +3517,11 @@ export interface components {
         CurrenciesResponse: {
             currencies: components["schemas"]["CurrencyInfo"][];
         };
-        CashWallet: {
-            /** Format: uuid */
-            id: string;
-            /** Format: uuid */
-            userId: string;
-            name: string;
-            currency: string;
-            balance: number;
-            availableBalance: number;
-            isDefault: boolean;
-            /** Format: date-time */
-            createdAt: string;
-            /** Format: date-time */
-            updatedAt: string;
-        };
-        WalletsTotalBalance: {
-            totalBalance?: number;
-            totalAvailableBalance?: number;
-            baseCurrency?: string;
-            walletBreakdown?: {
-                id?: string;
-                name?: string;
-                balance?: number;
-                availableBalance?: number;
-                currency?: string;
-                weight?: number;
-            }[];
-        };
-        BalanceHistory: {
-            data: {
-                /** Format: date-time */
-                date: string;
-                balance: number;
-                change: number;
-                percentChange: number | null;
-                high: number;
-                low: number;
-            }[];
-            meta: {
-                period: string;
-                resolution: string;
-                high: number;
-                low: number;
-                average: number;
-                /** Format: date-time */
-                startDate: string;
-                /** Format: date-time */
-                endDate: string;
-                change: number;
-                percentChange?: number | null;
-            };
-        };
         CashTransaction: components["schemas"]["FeeFxFields"] & {
             /** Format: uuid */
             id: string;
             /** Format: uuid */
-            walletId: string;
+            portfolioId: string;
             type: string;
             amount: number;
             currency: string;
@@ -3168,23 +3529,27 @@ export interface components {
             /** Format: date-time */
             createdAt: string;
             description?: string | null;
-            transaction_date?: string | null;
-            payment_method?: string | null;
+            transactionDate?: string | null;
+            paymentMethod?: string | null;
             fees?: number | null;
-            fees_type?: string | null;
+            feesType?: string | null;
             /** Format: uuid */
-            to_wallet_id?: string | null;
-            new_balance?: number | null;
-            remaining_balance?: number | null;
-            walletName?: string | null;
+            toPortfolioId?: string | null;
+            /** @description Row's own-currency balance after this tx (ledger-derived */
+            balanceAfter?: number | null;
+            portfolioName?: string | null;
+            /** @description Import provenance tag; NULL for manually-created rows */
+            externalSource?: string | null;
+            /** @description Importer-supplied dedup key; unique per externalSource */
+            externalId?: string | null;
             labels?: components["schemas"]["Label"][];
         };
         RecentCashTransaction: {
             /** Format: uuid */
             id: string;
             /** Format: uuid */
-            walletId: string;
-            walletName?: string | null;
+            portfolioId: string;
+            portfolioName?: string | null;
             type: string;
             displayLabel: string;
             amount: string;
@@ -3196,7 +3561,7 @@ export interface components {
             /** Format: date-time */
             createdAt: string;
             /** Format: uuid */
-            portfolioId?: string | null;
+            toPortfolioId?: string | null;
             fees?: number | null;
             taxes?: number | null;
             isInternalTransfer: boolean;
@@ -3216,6 +3581,178 @@ export interface components {
                 limit?: number;
                 totalPages?: number;
             };
+        };
+        ImportPortfolioBootstrapRequest: {
+            externalSource: string;
+            name: string;
+            currency: string;
+            baseCurrency?: string;
+        };
+        ImportPortfolioBootstrapResponse: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            currency: string;
+            baseCurrency?: string;
+            /** @description true = just inserted (external_source tagged); false = already existed (not re-tagged) */
+            created: boolean;
+        };
+        ImportLabelBootstrapRequest: {
+            externalSource: string;
+            /** @description Label names to ensure; idempotent per (user, name) */
+            labels: string[];
+        };
+        ImportLabelBootstrapResponse: {
+            labels: {
+                name: string;
+                /** Format: uuid */
+                id: string;
+                /** @description true = just created; false = already existed */
+                created?: boolean;
+            }[];
+        };
+        ImportTransactionsRequest: {
+            source: {
+                externalSource: string;
+                spreadsheetId: string;
+                sheet: string;
+            };
+            /** @description Idempotent; re-submitting the same externalId array is a no-op */
+            transactions: components["schemas"]["ImportTransaction"][];
+        };
+        ImportTransaction: {
+            /** @description Stable dedup key derived by the importer (e.g. SHA256 of source row fields) */
+            externalId: string;
+            /** @description Must exist for this user; use portfolios/bootstrap to create missing ones */
+            portfolioName: string;
+            /** Format: date-time */
+            executedAt: string;
+            cashTx?: components["schemas"]["ImportPortfolioCashTx"];
+            /** @description Omit for pure-cash events (DEPOSIT/WITHDRAWAL) */
+            portfolioTx?: components["schemas"]["ImportPortfolioTx"];
+        };
+        ImportPortfolioCashTx: components["schemas"]["FeeFxFields"] & {
+            /** @enum {string} */
+            type: "DEPOSIT" | "WITHDRAWAL" | "TRANSFER";
+            /** @description Signed; negative = cash out */
+            amount: number;
+            currency: string;
+            description?: string | null;
+            /** Format: date */
+            transactionDate?: string | null;
+            status?: string;
+            paymentMethod?: string | null;
+            fees?: number | null;
+            /** @enum {string|null} */
+            feesType?: "fixed" | "pct" | null;
+            exchangeRate?: number | null;
+            /** @description TRANSFER target; must exist and differ from the source portfolio */
+            toPortfolioName?: string | null;
+            targetAmount?: number | null;
+            reference?: string | null;
+            /** @description Label names to bootstrap + attach (unknown name → row error) */
+            labels?: string[];
+        };
+        ImportPortfolioTx: components["schemas"]["FeeFxFields"] & {
+            /** Format: uuid */
+            portfolioId: string;
+            /** @enum {string} */
+            type: "BUY" | "SELL" | "DIVIDEND" | "EXPIRATION";
+            instrumentSymbol: string;
+            instrumentName?: string | null;
+            /** @default STOCK */
+            assetType: string;
+            sector?: string | null;
+            industry?: string | null;
+            /** @description ISO-2 country code (e.g. PL) sourced from the import catalog */
+            country?: string | null;
+            /** @description Legacy 2/3-letter country code when it differs from the ISO-2 country */
+            countryCode?: string | null;
+            /** @description Post-restatement quantity used in calculations */
+            quantity: number;
+            /** @description Post-restatement unit price used in calculations */
+            price: number;
+            /** @description Pre-restatement quantity; frozen at creation */
+            originalQuantity?: number | null;
+            /** @description Pre-restatement unit price; frozen at creation */
+            originalPrice?: number | null;
+            /** @description The currency the trade was PAID or SETTLED in. This is not necessarily the instrument's listing currency — a broker will sell a GBP-listed stock priced in PLN — so it must not be used as the instrument's currency. */
+            currency: string;
+            /** @description The currency the instrument TRADES in, when the importer resolved it. Takes precedence over `currency` for the stored `instrumentCurrency`; `currency` is used only as a fallback. Set it whenever the source is authoritative (a crypto quote pair, a venue-qualified listing), and leave it null when the instrument's currency is genuinely unknown — the "never guess" rule applies, and a wrong listing currency is worse than a known-missing one. */
+            listingCurrency?: string | null;
+            fees?: number | null;
+            /** @enum {string|null} */
+            feesType?: "fixed" | "pct" | null;
+            taxes?: number | null;
+            realizedGainLoss?: number | null;
+            /** Format: date-time */
+            executedAt?: string | null;
+            /**
+             * @description SHORT marks a short-option open (position-creating, regardless of type); for type=EXPIRATION it closes the short-option lot at zero value (zero cash effect)
+             * @enum {string|null}
+             */
+            direction?: "LONG" | "SHORT" | null;
+            /** @enum {string|null} */
+            optionType?: "CALL" | "PUT" | null;
+            contractSize?: number | null;
+            /** @description Label names to attach to the row's open position (resolved server-side per user; unknown names are a row error) */
+            positionLabels?: string[];
+            /** @description Label names to attach to the row's portfolio transaction (same resolution as positionLabels) */
+            transactionLabels?: string[];
+        };
+        ImportTransactionsResponse: {
+            inserted: number;
+            skipped: number;
+            /** @description Row-level failures; the rest of the batch still succeeds */
+            errors: {
+                externalId: string;
+                error: string;
+                message?: string;
+            }[];
+            syncRun?: components["schemas"]["SyncRun"];
+        };
+        SyncRun: {
+            id: number;
+            externalSource: string;
+            spreadsheetId: string;
+            sheet: string;
+            lastRow?: number | null;
+            /** @enum {string} */
+            status: "pending" | "running" | "done" | "failed";
+            /** Format: date-time */
+            startedAt?: string | null;
+            /** Format: date-time */
+            completedAt?: string | null;
+            error?: string | null;
+            insertedCashTx: number;
+            insertedPtx: number;
+            skipped: number;
+        };
+        SyncRunsResponse: {
+            items?: components["schemas"]["SyncRun"][];
+            total?: number;
+        };
+        SourceWipeResponse: {
+            deleted?: {
+                cashTransactions?: number;
+                portfolios?: number;
+                syncRuns?: number;
+                positions?: number;
+                portfolioTransactions?: number;
+                valueSnapshots?: number;
+                shares?: number;
+                portfolioBackfillMetadata?: number;
+            };
+        };
+        ApplySplitRequest: {
+            symbol: string;
+            factor: number;
+            /** Format: date */
+            effectiveDate: string;
+        };
+        ApplySplitResponse: {
+            updatedTransactions: number;
+            affectedPortfolios: number;
         };
         Watchlist: {
             /** Format: uuid */
@@ -3379,18 +3916,77 @@ export interface components {
             items: components["schemas"]["AdminFxRate"][];
             pagination: components["schemas"]["AdminPagination"];
         };
+        TopologyStatusResponse: {
+            services: components["schemas"]["TopologyServiceStatus"][];
+            /**
+             * Format: date-time
+             * @description ISO-8601 timestamp of the status fetch
+             */
+            fetchedAt: string;
+        };
+        TopologyServiceStatus: {
+            /** @description Deployment name (matches the topology graph node id) */
+            name: string;
+            /** @description Whether /__meta responded within 3 s (HTTP workloads), or ready replicas >= desired replicas for k8s-only workloads (postgres/redis) */
+            reachable: boolean;
+            /** @enum {string} */
+            impl: "real" | "mock" | "unknown" | "job";
+            version?: string;
+            replicas?: {
+                desired: number;
+                ready: number;
+            } | null;
+            restarts?: number | null;
+        };
+        TopologyTrafficResponse: {
+            services: components["schemas"]["TopologyServiceTraffic"][];
+            cachestProviders: {
+                /** @description cachest outbound server_address label, e.g. openst or alphavantage.co */
+                provider: string;
+                p99LatencyMs: number;
+            }[];
+            /**
+             * Format: date-time
+             * @description ISO-8601 timestamp of the traffic fetch
+             */
+            fetchedAt: string;
+        };
+        TopologyServiceTraffic: {
+            /** @description Service name (matches the topology graph node id) */
+            name: string;
+            /** @description Requests/min (HTTP) or transactions/min (databases) */
+            requestsPerMin?: number | null;
+            /** @description Fraction of requests returning 4xx/5xx (0–1) */
+            errorRate?: number | null;
+            /** @description p99 request latency in ms (HTTP workloads only) */
+            p99LatencyMs?: number | null;
+            /** @description Current CPU usage in cores (workload resource metrics) */
+            cpuCores?: number | null;
+            /** @description Current working-set memory in bytes (workload resource metrics) */
+            memoryBytes?: number | null;
+            /** @description Open database connections (postgres only, via Crunchy exporter) */
+            connections?: number | null;
+            /**
+             * @description Metric source used (otel when D56 metrics present, ingress fallback, prometheus for k8s workload resource metrics, none when Prometheus unavailable)
+             * @enum {string}
+             */
+            source: "otel" | "ingress" | "none" | "prometheus";
+        };
     };
     responses: never;
     parameters: {
         /** @description Instrument symbol, e.g. AAPL or AAPL.US */
         symbol: string;
         portfolioId: string;
-        walletId: string;
         watchlistId: string;
         positionId: string;
         eventId: string;
         /** @description Opaque cursor for keyset pagination */
         cursor: string;
+        /** @description Optional ISO-4217 target currency — prices are converted server-side (plan §48.2); same/absent value serves the native series */
+        currency: string;
+        /** @description Optional ISO-4217 currency the CALLER believes the prices are denominated in (e.g. wallets passes the position's `instrumentCurrency`). Honoured only where the server's own resolver is silent; a locally resolved base is never overridden (plan §47, "never guess"). Without it, a ticker listed on several venues in different currencies cannot be converted at all, which made `currency` unusable for the caller's whole request (plan §63.10.5). */
+        baseCurrency: string;
         limit: number;
         page: number;
         perPage: number;
@@ -3496,6 +4092,42 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    refresh: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RefreshRequest"];
+            };
+        };
+        responses: {
+            /** @description Refreshed — a new access_token for the same user */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthResponse"];
+                };
+            };
+            /**
+             * @description No refresh session for this token, or the token failed signature /
+             *     issuer / audience verification. The client must re-authenticate.
+             */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
             };
         };
     };
@@ -4229,6 +4861,8 @@ export interface operations {
             query?: {
                 resolution?: "1" | "5" | "15" | "30" | "60" | "daily" | "weekly" | "monthly";
                 timeframe?: string;
+                /** @description Optional ISO-4217 target currency — prices are converted server-side (plan §48.2); same/absent value serves the native series */
+                currency?: components["parameters"]["currency"];
             };
             header?: never;
             path: {
@@ -4419,6 +5053,8 @@ export interface operations {
             query: {
                 date: string;
                 exchange?: string;
+                /** @description Optional ISO-4217 target currency — prices are converted server-side (plan §48.2); same/absent value serves the native series */
+                currency?: components["parameters"]["currency"];
             };
             header?: never;
             path: {
@@ -4445,6 +5081,10 @@ export interface operations {
             query: {
                 from: string;
                 to: string;
+                /** @description Optional ISO-4217 target currency — prices are converted server-side (plan §48.2); same/absent value serves the native series */
+                currency?: components["parameters"]["currency"];
+                /** @description Optional ISO-4217 currency the CALLER believes the prices are denominated in (e.g. wallets passes the position's `instrumentCurrency`). Honoured only where the server's own resolver is silent; a locally resolved base is never overridden (plan §47, "never guess"). Without it, a ticker listed on several venues in different currencies cannot be converted at all, which made `currency` unusable for the caller's whole request (plan §63.10.5). */
+                baseCurrency?: components["parameters"]["baseCurrency"];
             };
             header?: never;
             path: {
@@ -4631,7 +5271,10 @@ export interface operations {
     };
     getMergedPortfolios: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Performance timeframe for the merged series (defaults to all available history) */
+                timeframe?: "1W" | "1M" | "3M" | "6M" | "1Y" | "2Y" | "ALL";
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -4876,6 +5519,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PortfolioAnalytics"];
+                };
+            };
+        };
+    };
+    portfolioRecompute: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["portfolioId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Recompute enqueued */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BackfillRecomputeResponse"];
+                };
+            };
+            /** @description Portfolio not owned by the caller or missing */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };
@@ -5411,13 +6085,242 @@ export interface operations {
             };
         };
     };
-    setWalletTransactionLabels: {
+    getPortfolioCash: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                id: components["parameters"]["walletId"];
-                transactionId: string;
+                id: components["parameters"]["portfolioId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Cash position */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortfolioCash"];
+                };
+            };
+        };
+    };
+    getPortfolioCashHistory: {
+        parameters: {
+            query?: {
+                period?: string;
+                resolution?: string;
+            };
+            header?: never;
+            path: {
+                id: components["parameters"]["portfolioId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Cash balance history */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortfolioCashHistory"];
+                };
+            };
+        };
+    };
+    getPortfolioCashTransactions: {
+        parameters: {
+            query?: {
+                page?: number;
+                limit?: number;
+                /** @description Comma-separated label ids; AND filter (entity must have all) */
+                labels?: string;
+            };
+            header?: never;
+            path: {
+                id: components["parameters"]["portfolioId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Cash transactions */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageResponse"];
+                };
+            };
+        };
+    };
+    depositCash: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["portfolioId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DepositCashRequest"];
+            };
+        };
+        responses: {
+            /** @description Deposited */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CashTransaction"];
+                };
+            };
+        };
+    };
+    withdrawCash: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["portfolioId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WithdrawCashRequest"];
+            };
+        };
+        responses: {
+            /** @description Withdrawn */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CashTransaction"];
+                };
+            };
+        };
+    };
+    transferCash: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["portfolioId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TransferCashRequest"];
+            };
+        };
+        responses: {
+            /** @description Transferred */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CashTransaction"];
+                };
+            };
+        };
+    };
+    getRecentCashTransactions: {
+        parameters: {
+            query?: {
+                page?: components["parameters"]["page"];
+                limit?: components["parameters"]["limit"];
+                sortBy?: string;
+                sortOrder?: "asc" | "desc";
+                /** @description Comma-separated label ids; AND filter (entity must have all) */
+                labels?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Recent cash transactions */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecentCashTransactionsPage"];
+                };
+            };
+        };
+    };
+    deleteCashTransaction: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                txId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    updateCashTransaction: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                txId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    type?: string;
+                    amount?: number;
+                    description?: string;
+                    date?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecentCashTransaction"];
+                };
+            };
+        };
+    };
+    setCashTransactionLabels: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                txId: string;
             };
             cookie?: never;
         };
@@ -5458,210 +6361,139 @@ export interface operations {
             };
         };
     };
-    listWallets: {
+    importPortfolioBootstrap: {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
-        responses: {
-            /** @description Wallets */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    createWallet: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: {
+        requestBody: {
             content: {
-                "application/json": {
-                    name?: string;
-                    currency?: string;
-                };
+                "application/json": components["schemas"]["ImportPortfolioBootstrapRequest"];
             };
         };
         responses: {
-            /** @description Created */
-            201: {
+            /** @description Portfolio ensured */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["CashWallet"];
+                    "application/json": components["schemas"]["ImportPortfolioBootstrapResponse"];
+                };
+            };
+            /** @description Missing or invalid token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Malformed payload */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };
     };
-    getWalletsTotalBalance: {
+    importLabelBootstrap: {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ImportLabelBootstrapRequest"];
+            };
+        };
         responses: {
-            /** @description Total balance */
+            /** @description Labels ensured */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["WalletsTotalBalance"];
+                    "application/json": components["schemas"]["ImportLabelBootstrapResponse"];
+                };
+            };
+            /** @description Missing or invalid token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Malformed payload */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };
     };
-    getWalletBalanceHistory: {
+    importTransactions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ImportTransactionsRequest"];
+            };
+        };
+        responses: {
+            /** @description Batch processed; row-level failures collected in errors[] */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportTransactionsResponse"];
+                };
+            };
+            /** @description Missing or invalid token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Malformed payload — entire batch rejected */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    listSyncRuns: {
         parameters: {
             query?: {
-                period?: string;
-                resolution?: string;
-            };
-            header?: never;
-            path: {
-                id: components["parameters"]["walletId"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Balance history */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["BalanceHistory"];
-                };
-            };
-        };
-    };
-    depositCash: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: components["parameters"]["walletId"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["DepositRequest"];
-            };
-        };
-        responses: {
-            /** @description Deposited */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CashTransaction"];
-                };
-            };
-        };
-    };
-    withdrawCash: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: components["parameters"]["walletId"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["WithdrawRequest"];
-            };
-        };
-        responses: {
-            /** @description Withdrawn */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CashTransaction"];
-                };
-            };
-        };
-    };
-    transferCash: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: components["parameters"]["walletId"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["TransferRequest"];
-            };
-        };
-        responses: {
-            /** @description Transferred */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CashTransaction"];
-                };
-            };
-        };
-    };
-    getCashTransactions: {
-        parameters: {
-            query?: {
-                page?: number;
+                /** @description Filter runs by source */
+                externalSource?: string;
                 limit?: number;
-                /** @description Comma-separated label ids; AND filter (entity must have all) */
-                labels?: string;
-            };
-            header?: never;
-            path: {
-                id: components["parameters"]["walletId"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Transactions */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PageResponse"];
-                };
-            };
-        };
-    };
-    getRecentCashTransactions: {
-        parameters: {
-            query?: {
-                page?: components["parameters"]["page"];
-                limit?: components["parameters"]["limit"];
-                sortBy?: string;
-                sortOrder?: "asc" | "desc";
+                offset?: number;
             };
             header?: never;
             path?: never;
@@ -5669,23 +6501,32 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Recent transactions */
+            /** @description Sync runs */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["RecentCashTransactionsPage"];
+                    "application/json": components["schemas"]["SyncRunsResponse"];
+                };
+            };
+            /** @description Missing or invalid token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };
     };
-    deleteCashTransaction: {
+    deleteSyncRun: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                id: string;
+                id: number;
             };
             cookie?: never;
         };
@@ -5698,35 +6539,53 @@ export interface operations {
                 };
                 content?: never;
             };
+            /** @description Missing or invalid token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Run not owned by the caller or missing */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
         };
     };
-    updateCashTransaction: {
+    wipeImportSource: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                id: string;
+                externalSource: string;
             };
             cookie?: never;
         };
-        requestBody?: {
-            content: {
-                "application/json": {
-                    type?: string;
-                    amount?: number;
-                    description?: string;
-                    date?: string;
-                };
-            };
-        };
+        requestBody?: never;
         responses: {
-            /** @description Updated */
+            /** @description Wiped */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["RecentCashTransaction"];
+                    "application/json": components["schemas"]["SourceWipeResponse"];
+                };
+            };
+            /** @description Missing or invalid token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };
@@ -6311,6 +7170,39 @@ export interface operations {
             };
             /** @description Not a portfoliost_admin */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    applySplit: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApplySplitRequest"];
+            };
+        };
+        responses: {
+            /** @description Adjusted */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApplySplitResponse"];
+                };
+            };
+            /** @description Internal error */
+            500: {
                 headers: {
                     [name: string]: unknown;
                 };
