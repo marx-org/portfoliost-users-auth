@@ -1,7 +1,7 @@
 CREATE TABLE "users_auth"."refresh_sessions" (
 	"id_token_jti" text PRIMARY KEY NOT NULL,
 	"user_id" text NOT NULL,
-	"refresh_token_hash" text NOT NULL,
+	"refresh_token" text NOT NULL,
 	"created_at" text NOT NULL,
 	"updated_at" text NOT NULL
 );

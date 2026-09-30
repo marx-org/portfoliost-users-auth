@@ -1,6 +1,5 @@
 import { Hono } from "hono"
 import { eq } from "drizzle-orm"
-import { createHash } from "node:crypto"
 import { userIdentityMiddleware } from "../auth.js"
 import { getDb, type DB } from "../db/index.js"
 import { refreshSessions, userPreferences } from "../db/schema.js"
@@ -22,14 +21,6 @@ interface PocketIDTokenResponse {
   expires_in: number
   id_token: string
   refresh_token?: string
-}
-
-/**
- * sha256 hex of a refresh token. PocketID stores refresh tokens hashed the same
- * way, so if this table ever leaks it holds no usable credential.
- */
-export function hashRefreshToken(token: string): string {
-  return createHash("sha256").update(token).digest("hex")
 }
 
 /** JWT payload shape of the Pocket-ID id_token. */
@@ -61,6 +52,10 @@ function toGroups(raw: unknown): string[] {
  * keyed by that token's `jti` (§77.2). A missing refresh_token or jti is not an
  * error — it just means the browser gets no long-lived session and must
  * re-authenticate at expiry, exactly as it does today.
+ *
+ * Stored in the clear: the refresh grant must send the value verbatim to
+ * PocketID, so a hash would be unexchangeable. See the comment on
+ * `refreshSessions` for why that is acceptable here.
  */
 async function persistRefreshSession(
   db: DB,
@@ -74,13 +69,13 @@ async function persistRefreshSession(
     .values({
       idTokenJti: idTokenClaims.jti,
       userId: idTokenClaims.sub,
-      refreshTokenHash: hashRefreshToken(refreshToken),
+      refreshToken,
       createdAt: now,
       updatedAt: now,
     })
     .onConflictDoUpdate({
       target: refreshSessions.idTokenJti,
-      set: { refreshTokenHash: hashRefreshToken(refreshToken), updatedAt: now },
+      set: { refreshToken, updatedAt: now },
     })
 }
 
