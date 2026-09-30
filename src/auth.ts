@@ -101,3 +101,38 @@ export function requireGroup(group: string) {
     await next()
   }
 }
+
+/**
+ * Verify a token's signature, issuer and audience while deliberately ignoring
+ * `exp` (§77.3).
+ *
+ * An expired id_token is the *normal* input to POST /api/auth/refresh — the
+ * browser calls it precisely because its token lapsed. The token is used only
+ * to identify which server-side refresh session to rotate; identity is always
+ * taken from the freshly issued token, never from this one.
+ *
+ * Audience comes from the environment only. The `X-Auth-Audience` header that
+ * `validateJwt` honours is caller-controlled, and accepting a caller-chosen
+ * audience would let a token minted for some other client be replayed here.
+ */
+export async function verifySessionToken(token: string): Promise<jose.JWTPayload> {
+  const issuerUrl = process.env.POCKETID_ISSUER_URL
+  const audience = process.env.POCKETID_AUDIENCE
+  if (!issuerUrl || !audience) throw new Error("OIDC not configured")
+
+  const key = await getJwks({
+    issuerUrl,
+    jwksUri: `${issuerUrl}/.well-known/jwks.json`,
+    audience,
+  })
+
+  // jose has no "skip exp" flag; a tolerance this large makes the check always
+  // pass. Signature, issuer and audience are still fully enforced.
+  const { payload } = await jose.jwtVerify(token, key, {
+    issuer: issuerUrl,
+    audience,
+    clockTolerance: Number.MAX_SAFE_INTEGER,
+  })
+
+  return payload
+}
