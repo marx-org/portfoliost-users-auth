@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest"
+import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll } from "vitest"
 import { Hono } from "hono"
 import { eq } from "drizzle-orm"
 
@@ -7,6 +7,90 @@ import { refreshSessions } from "../db/schema.js"
 import { createTestDb } from "../db/test-db.js"
 
 describe("Auth Routes", () => {
+  // One issuer, audience and keypair for the whole file. `getJwks` caches its
+  // RemoteJWKSet at module scope on first use, so a second issuer (or a second
+  // keypair) in this file fails with JWKSNoMatchingKey no matter what the stub
+  // returns.
+  const ISSUER = "http://auth-jwks.test"
+  const AUDIENCE = "auth-audience"
+  const ALG = "ES256"
+  const KID = "test-key"
+
+  let privateKey: CryptoKey
+  let jwksBody: string
+  let origFetch: typeof fetch
+
+  beforeAll(async () => {
+    const { generateKeyPair, exportJWK } = await import("jose")
+    const kp = await generateKeyPair(ALG)
+    privateKey = kp.privateKey
+    jwksBody = JSON.stringify({
+      keys: [{ ...(await exportJWK(kp.publicKey)), kid: KID, alg: ALG, use: "sig" }],
+    })
+    origFetch = globalThis.fetch
+  })
+
+  afterAll(() => {
+    globalThis.fetch = origFetch
+  })
+
+  /** Install a fetch stub that serves the JWKS and the PocketID token endpoint. */
+  function stubPocketId(
+    onToken: (params: URLSearchParams, callNumber: number) => Response | Promise<Response>
+  ): { calls: URLSearchParams[] } {
+    const calls: URLSearchParams[] = []
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url
+      if (url.includes("/.well-known/jwks.json")) {
+        return new Response(jwksBody, { headers: { "content-type": "application/json" } })
+      }
+      if (url.includes("/api/oidc/token")) {
+        const body = typeof init?.body === "string" ? init.body : ""
+        const params = new URLSearchParams(body)
+        calls.push(params)
+        return onToken(params, calls.length)
+      }
+      return origFetch(input as RequestInfo, init)
+    }) as typeof fetch
+    return { calls }
+  }
+
+  function setOIDCEnv() {
+    process.env.POCKETID_ISSUER_URL = ISSUER
+    process.env.POCKETID_AUDIENCE = AUDIENCE
+    process.env.POCKETID_TOKEN_URL = "http://pocket-id.test/api/oidc/token"
+    process.env.POCKETID_CLIENT_ID = AUDIENCE
+  }
+
+  function clearOIDCEnv() {
+    delete process.env.POCKETID_ISSUER_URL
+    delete process.env.POCKETID_AUDIENCE
+    delete process.env.POCKETID_TOKEN_URL
+    delete process.env.POCKETID_CLIENT_ID
+  }
+
+  async function signToken(opts: {
+    jti: string
+    sub?: string
+    groups?: string[]
+    expired?: boolean
+    issuer?: string
+    email?: string
+  }) {
+    const { SignJWT } = await import("jose")
+    let b = new SignJWT({
+      sub: opts.sub ?? "user-42",
+      email: opts.email ?? "alice@example.com",
+      groups: opts.groups ?? ["portfoliost_user"],
+    })
+      .setProtectedHeader({ alg: ALG, kid: KID })
+      .setIssuer(opts.issuer ?? ISSUER)
+      .setAudience(AUDIENCE)
+      .setJti(opts.jti)
+      .setExpirationTime(opts.expired ? "-10m" : "5m")
+    if (opts.expired) b = b.setIssuedAt(Math.floor(Date.now() / 1000) - 3600)
+    return b.sign(privateKey)
+  }
   let ctx: Awaited<ReturnType<typeof createTestDb>>
   let app: Hono
 
@@ -216,79 +300,16 @@ describe("Auth Routes", () => {
   })
 
   describe("POST /api/auth/refresh", () => {
-    const ISSUER = "http://refresh-jwks.test"
-    const AUDIENCE = "refresh-audience"
-    const ALG = "ES256"
-
-    let privateKey: CryptoKey
-    let jwksBody: string
     let tokenCalls: URLSearchParams[]
-    let tokenResponder: (n: number) => Response | Promise<Response>
-    let origFetch: typeof fetch
 
-    // One keypair for the whole block: `getJwks` caches the RemoteJWKSet at
-    // module scope, so a fresh keypair per test would leave every test after
-    // the first verifying against the previous test's public key.
-    beforeAll(async () => {
-      const { generateKeyPair, exportJWK } = await import("jose")
-      const kp = await generateKeyPair(ALG)
-      privateKey = kp.privateKey
-      jwksBody = JSON.stringify({
-        keys: [{ ...(await exportJWK(kp.publicKey)), kid: "test-key", alg: ALG, use: "sig" }],
-      })
-    })
-
-    async function signIdToken(opts: {
-      jti: string
-      sub?: string
-      groups?: string[]
-      expired?: boolean
-      issuer?: string
-    }) {
-      const { SignJWT } = await import("jose")
-      let b = new SignJWT({
-        sub: opts.sub ?? "user-42",
-        email: "alice@example.com",
-        groups: opts.groups ?? ["portfoliost_user"],
-      })
-        .setProtectedHeader({ alg: ALG, kid: "test-key" })
-        .setIssuer(opts.issuer ?? ISSUER)
-        .setAudience(AUDIENCE)
-        .setJti(opts.jti)
-        .setExpirationTime(opts.expired ? "-10m" : "5m")
-      if (opts.expired) b = b.setIssuedAt(Math.floor(Date.now() / 1000) - 3600)
-      return b.sign(privateKey)
-    }
-
-    beforeEach(async () => {
-      process.env.POCKETID_ISSUER_URL = ISSUER
-      process.env.POCKETID_AUDIENCE = AUDIENCE
-      process.env.POCKETID_TOKEN_URL = "http://pocket-id.test/api/oidc/token"
-      process.env.POCKETID_CLIENT_ID = AUDIENCE
+    beforeEach(() => {
+      setOIDCEnv()
       tokenCalls = []
-      tokenResponder = () => new Response("{}", { status: 200 })
-
-      origFetch = globalThis.fetch
-      globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
-        const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url
-        if (url.includes("/.well-known/jwks.json")) {
-          return new Response(jwksBody, { headers: { "content-type": "application/json" } })
-        }
-        if (url.includes("/api/oidc/token")) {
-          const body = typeof init?.body === "string" ? init.body : ""
-          tokenCalls.push(new URLSearchParams(body))
-          return tokenResponder(tokenCalls.length)
-        }
-        return origFetch(input as RequestInfo, init)
-      }) as typeof fetch
     })
 
     afterEach(() => {
       globalThis.fetch = origFetch
-      delete process.env.POCKETID_ISSUER_URL
-      delete process.env.POCKETID_AUDIENCE
-      delete process.env.POCKETID_TOKEN_URL
-      delete process.env.POCKETID_CLIENT_ID
+      clearOIDCEnv()
     })
 
     async function seedSession(jti: string, refreshToken = "rt-1") {
@@ -304,19 +325,11 @@ describe("Auth Routes", () => {
 
     it("accepts an expired token, rotates the row to the new jti, and hides the refresh token", async () => {
       await seedSession("old-jti")
-      tokenResponder = async () => {
-        const { SignJWT } = await import("jose")
-        const newToken = await new SignJWT({
-          sub: "user-42",
-          email: "alice@example.com",
+      tokenCalls = stubPocketId(async () => {
+        const newToken = await signToken({
+          jti: "new-jti",
           groups: ["portfoliost_user", "portfoliost_admin"],
         })
-          .setProtectedHeader({ alg: ALG, kid: "test-key" })
-          .setIssuer(ISSUER)
-          .setAudience(AUDIENCE)
-          .setJti("new-jti")
-          .setExpirationTime("1h")
-          .sign(privateKey)
         return new Response(
           JSON.stringify({
             access_token: "at",
@@ -327,9 +340,9 @@ describe("Auth Routes", () => {
           }),
           { headers: { "content-type": "application/json" } }
         )
-      }
+      }).calls
 
-      const expired = await signIdToken({ jti: "old-jti", expired: true })
+      const expired = await signToken({ jti: "old-jti", expired: true })
       const res = await app.request("/api/auth/refresh", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -356,15 +369,8 @@ describe("Auth Routes", () => {
 
     it("rejects a replay of an already-rotated jti", async () => {
       await seedSession("old-jti")
-      tokenResponder = async () => {
-        const { SignJWT } = await import("jose")
-        const newToken = await new SignJWT({ sub: "user-42", email: "a@example.com" })
-          .setProtectedHeader({ alg: ALG, kid: "test-key" })
-          .setIssuer(ISSUER)
-          .setAudience(AUDIENCE)
-          .setJti("new-jti")
-          .setExpirationTime("1h")
-          .sign(privateKey)
+      tokenCalls = stubPocketId(async () => {
+        const newToken = await signToken({ jti: "new-jti" })
         return new Response(
           JSON.stringify({
             access_token: "at",
@@ -375,9 +381,9 @@ describe("Auth Routes", () => {
           }),
           { headers: { "content-type": "application/json" } }
         )
-      }
+      }).calls
 
-      const expired = await signIdToken({ jti: "old-jti", expired: true })
+      const expired = await signToken({ jti: "old-jti", expired: true })
       const first = await app.request("/api/auth/refresh", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -396,7 +402,7 @@ describe("Auth Routes", () => {
     })
 
     it("rejects a valid token with no session row", async () => {
-      const token = await signIdToken({ jti: "unknown-jti" })
+      const token = await signToken({ jti: "unknown-jti" })
       const res = await app.request("/api/auth/refresh", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -408,7 +414,7 @@ describe("Auth Routes", () => {
 
     it("rejects a tampered signature and does not consume the session", async () => {
       await seedSession("good-jti")
-      const token = await signIdToken({ jti: "good-jti" })
+      const token = await signToken({ jti: "good-jti" })
       const [h, p, s] = token.split(".")
       const forged = `${h}.${Buffer.from('{"sub":"attacker"}').toString("base64url")}.${s}`
 
@@ -429,7 +435,7 @@ describe("Auth Routes", () => {
 
     it("rejects a token minted for a different issuer", async () => {
       await seedSession("good-jti")
-      const token = await signIdToken({ jti: "good-jti", issuer: "http://evil.test" })
+      const token = await signToken({ jti: "good-jti", issuer: "http://evil.test" })
       const res = await app.request("/api/auth/refresh", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -441,9 +447,11 @@ describe("Auth Routes", () => {
 
     it("drops the row when PocketID rejects the refresh token", async () => {
       await seedSession("dead-jti")
-      tokenResponder = () => new Response('{"error":"invalid_grant"}', { status: 400 })
+      tokenCalls = stubPocketId(
+        () => new Response('{"error":"invalid_grant"}', { status: 400 })
+      ).calls
 
-      const token = await signIdToken({ jti: "dead-jti" })
+      const token = await signToken({ jti: "dead-jti" })
       const res = await app.request("/api/auth/refresh", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -472,6 +480,72 @@ describe("Auth Routes", () => {
       expect(res.status).toBe(200)
       const data = await res.json()
       expect(data.success).toBe(true)
+    })
+
+    it("revokes the refresh session so the token can no longer be refreshed (§77.4)", async () => {
+      setOIDCEnv()
+      stubPocketId(() => new Response("{}", { status: 200 }))
+
+      try {
+        const now = new Date().toISOString()
+        await ctx.db.insert(refreshSessions).values({
+          idTokenJti: "logout-jti",
+          userId: "user-9",
+          refreshToken: "rt-9",
+          createdAt: now,
+          updatedAt: now,
+        })
+
+        // Expired is the normal case here too.
+        const token = await signToken({
+          jti: "logout-jti",
+          sub: "user-9",
+          email: "u@example.com",
+          expired: true,
+        })
+
+        const res = await app.request("/api/auth/logout", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id_token: token }),
+        })
+        expect(res.status).toBe(200)
+
+        const rows = await ctx.db.select().from(refreshSessions)
+        expect(rows).toHaveLength(0)
+
+        // Idempotent: logging out twice is still a 200.
+        const again = await app.request("/api/auth/logout", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id_token: token }),
+        })
+        expect(again.status).toBe(200)
+      } finally {
+        globalThis.fetch = origFetch
+        clearOIDCEnv()
+      }
+    })
+
+    it("still returns 200 when the id_token cannot be verified, keeping the session", async () => {
+      const now = new Date().toISOString()
+      await ctx.db.insert(refreshSessions).values({
+        idTokenJti: "keep-jti",
+        userId: "user-9",
+        refreshToken: "rt-keep",
+        createdAt: now,
+        updatedAt: now,
+      })
+
+      const res = await app.request("/api/auth/logout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id_token: "not-a-jwt" }),
+      })
+      expect(res.status).toBe(200)
+      // Nothing was deleted — an unverifiable token identifies nothing.
+      const rows = await ctx.db.select().from(refreshSessions)
+      expect(rows).toHaveLength(1)
     })
   })
 })

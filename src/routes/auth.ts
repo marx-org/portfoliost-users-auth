@@ -359,8 +359,39 @@ export function createAuthRoutes(db?: DB) {
       },
     } satisfies AuthResponse)
   })
-  // POST /api/auth/logout - Client-side logout (just clears session)
+  // POST /api/auth/logout - revoke this browser's refresh session (§77.4)
+  //
+  // Until now this was `return c.json({ success: true })` and revoked nothing.
+  // That was survivable while there was no long-lived session to lose; with a
+  // 30-day refresh token it would mean "log out" does not log out.
+  //
+  // `id_token` is optional so a client predating this still gets a 200 — but
+  // without it there is nothing to identify the session, and that logout is
+  // only local. The frontend sends it.
   router.post("/logout", async (c) => {
+    let idToken: string | undefined
+    try {
+      const body = (await c.req.json()) as { id_token?: string }
+      idToken = body?.id_token
+    } catch {
+      // Empty body is fine — see above.
+    }
+
+    if (idToken) {
+      try {
+        const claims = await verifySessionToken(idToken)
+        if (claims.jti) {
+          await getDbInstance()
+            .delete(refreshSessions)
+            .where(eq(refreshSessions.idTokenJti, claims.jti))
+        }
+      } catch (error) {
+        // A token we cannot verify cannot identify a session. Still 200 —
+        // logout is idempotent and the client clears its own state regardless.
+        console.error("Logout could not verify id_token:", error)
+      }
+    }
+
     return c.json({ success: true })
   })
 
