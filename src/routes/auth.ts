@@ -1,6 +1,6 @@
 import { Hono } from "hono"
 import { eq } from "drizzle-orm"
-import { userIdentityMiddleware } from "../auth.js"
+import { userIdentityMiddleware, verifySessionToken } from "../auth.js"
 import { getDb, type DB } from "../db/index.js"
 import { refreshSessions, userPreferences } from "../db/schema.js"
 import type { components } from "../generated/api-types.js"
@@ -110,6 +110,33 @@ async function exchangeWithPocketID(req: TokenExchangeRequest): Promise<PocketID
     const error = await response.text()
     console.error("PocketID token exchange failed:", response.status, error)
     throw new Error(`Token exchange failed: ${error}`)
+  }
+
+  return response.json()
+}
+
+/** Redeem a stored refresh token at Pocket-ID for a new token set. */
+async function refreshWithPocketID(refreshToken: string): Promise<PocketIDTokenResponse> {
+  const tokenUrl = process.env.POCKETID_TOKEN_URL
+  const clientId = process.env.POCKETID_CLIENT_ID
+  if (!tokenUrl || !clientId) throw new Error("PocketID not configured")
+
+  const params = new URLSearchParams({
+    grant_type: "refresh_token",
+    refresh_token: refreshToken,
+    client_id: clientId,
+  })
+
+  const response = await fetch(tokenUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: params.toString(),
+  })
+
+  if (!response.ok) {
+    const error = await response.text()
+    console.error("PocketID token refresh failed:", response.status, error)
+    throw new Error(`Token refresh failed: ${error}`)
   }
 
   return response.json()
@@ -243,6 +270,95 @@ export function createAuthRoutes(db?: DB) {
     } satisfies MeResponse)
   })
 
+  // POST /api/auth/refresh - rotate the refresh session and issue a new id_token (§77.3)
+  router.post("/refresh", async (c) => {
+    let body: { id_token?: string }
+    try {
+      body = await c.req.json()
+    } catch {
+      return c.json({ error: "Bad Request", message: "Invalid JSON body" }, 400)
+    }
+
+    const idToken = body.id_token
+    if (!idToken) {
+      return c.json({ error: "Bad Request", message: "id_token is required" }, 400)
+    }
+
+    // Identify the session from the submitted token. Expiry is not checked —
+    // a lapsed token is the normal reason to be here. Identity is taken from
+    // the *new* token below, never from this one.
+    let claims: { jti?: string }
+    try {
+      claims = await verifySessionToken(idToken)
+    } catch {
+      return c.json({ error: "Unauthorized", message: "Invalid token" }, 401)
+    }
+
+    if (!claims.jti) {
+      return c.json({ error: "Unauthorized", message: "Token has no jti claim" }, 401)
+    }
+
+    const db = getDbInstance()
+
+    const sessions = await db
+      .select()
+      .from(refreshSessions)
+      .where(eq(refreshSessions.idTokenJti, claims.jti))
+
+    // No row means: never logged in, already refreshed (the old jti is dead),
+    // or logged out. All three are the same thing to the caller.
+    const session = sessions[0]
+    if (!session) {
+      return c.json({ error: "Unauthorized", message: "No active session" }, 401)
+    }
+
+    let tokenResponse: PocketIDTokenResponse
+    try {
+      tokenResponse = await refreshWithPocketID(session.refreshToken)
+    } catch {
+      // PocketID rejected the token (revoked, user disabled, group changed).
+      // Drop the row so the client falls back to a real login instead of
+      // retrying a dead session on every request.
+      await db.delete(refreshSessions).where(eq(refreshSessions.idTokenJti, claims.jti))
+      return c.json({ error: "Unauthorized", message: "Session expired" }, 401)
+    }
+
+    const newClaims = decodeIdTokenPayload(tokenResponse.id_token)
+    if (!newClaims.jti || !newClaims.sub) {
+      return c.json({ error: "Unauthorized", message: "Malformed id_token" }, 401)
+    }
+
+    // Rotate: PocketID consumed the old refresh token, so the row must follow
+    // the new jti. Replacing the primary key in one statement keeps a crashed
+    // rotation from leaving two live sessions behind.
+    const now = new Date().toISOString()
+    await db
+      .delete(refreshSessions)
+      .where(eq(refreshSessions.idTokenJti, claims.jti))
+    await db.insert(refreshSessions).values({
+      idTokenJti: newClaims.jti,
+      userId: newClaims.sub,
+      refreshToken: tokenResponse.refresh_token ?? session.refreshToken,
+      createdAt: now,
+      updatedAt: now,
+    })
+
+    return c.json({
+      access_token: tokenResponse.id_token,
+      token_type: tokenResponse.token_type,
+      expires_in: tokenResponse.expires_in,
+      user: {
+        id: newClaims.sub,
+        email: newClaims.email || "",
+        groups: toGroups(newClaims.groups),
+        language: "en",
+        role: "user",
+        isDemoUser: false,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+    } satisfies AuthResponse)
+  })
   // POST /api/auth/logout - Client-side logout (just clears session)
   router.post("/logout", async (c) => {
     return c.json({ success: true })
