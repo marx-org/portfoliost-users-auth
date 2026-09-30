@@ -223,7 +223,7 @@ describe("Auth Routes", () => {
     let privateKey: CryptoKey
     let jwksBody: string
     let tokenCalls: URLSearchParams[]
-    let tokenResponder: (n: number) => Response
+    let tokenResponder: (n: number) => Response | Promise<Response>
     let origFetch: typeof fetch
 
     // One keypair for the whole block: `getJwks` caches the RemoteJWKSet at
