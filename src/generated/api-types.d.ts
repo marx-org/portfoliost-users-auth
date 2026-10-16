@@ -1020,6 +1020,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/portfolios/positions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Open positions across all portfolios
+         * @description Every OPEN position the identity holds, across every one of its portfolios, each carrying `portfolioName`.
+         *     Distinct from `/portfolios/held-stocks`, which aggregates BY SYMBOL and so cannot answer "which portfolio is this row from" — the question the cumulative Performance tab's performer cards exist to answer, since the same ticker can be held in two portfolios with very different results. Unlike `/portfolios/{id}/positions` it needs no id, and it deliberately returns no portfolio-specific derived state.
+         *     `portfolioName` is null on the per-portfolio route, which keeps satisfying the same `Position` schema unchanged.
+         */
+        get: operations["getAllPositions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/portfolios/shares": {
         parameters: {
             query?: never;
@@ -2002,7 +2024,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Apply a split adjustment factor for a symbol */
+        /** Apply a split candidate for a symbol */
         post: operations["applySplitCandidate"];
         delete?: never;
         options?: never;
@@ -2095,6 +2117,115 @@ export interface paths {
          *     Sorting, filtering and pagination are all server-side.
          */
         get: operations["listAdminFxRates"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/listing-overrides": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List and search curated listing overrides
+         * @description Admin-facing list of curated venue overrides. Search matches ticker,
+         *     venue and listing key; `status` filters active/disabled. Each row
+         *     carries `upstreamPresent`, `tickerConflict` and `precedence` so the
+         *     reviewer sees how it relates to the upstream GitHub reference.
+         */
+        get: operations["listAdminListingOverrides"];
+        put?: never;
+        /** Create a curated listing override */
+        post: operations["createAdminListingOverride"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/listing-overrides/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Preview upstream conflict and precedence for a prospective override
+         * @description Resolves the upstream/conflict picture for a ticker+venue *before* an
+         *     override is saved, so the reviewer can see the upstream currency and any
+         *     ambiguity the override would take precedence over.
+         */
+        get: operations["previewAdminListingOverride"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/listing-overrides/{listingKey}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description `<EXCHANGE>::<TICKER>` (URL-encoded) */
+                listingKey: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** Edit a curated listing override */
+        put: operations["updateAdminListingOverride"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/listing-overrides/{listingKey}/disable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description `<EXCHANGE>::<TICKER>` (URL-encoded) */
+                listingKey: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Disable a curated listing override
+         * @description Flips status to `disabled`; the row and its history are retained.
+         */
+        post: operations["disableAdminListingOverride"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/listing-overrides/{listingKey}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description `<EXCHANGE>::<TICKER>` (URL-encoded) */
+                listingKey: string;
+            };
+            cookie?: never;
+        };
+        /** Audit history for a curated listing override */
+        get: operations["getAdminListingOverrideHistory"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2453,6 +2584,112 @@ export interface components {
             state?: string | null;
             employeeTotal?: number | null;
             ceo?: string | null;
+            /** @description Per-asset-class key facts, discriminated by `kind` (plan §86). Null when the provider tier has nothing class-specific to say for this symbol. `kind` is deliberately redundant with `assetType`: `assetType` is the SCREAMING_CASE contract enum and is null when the symbol is missing from the local reference table, whereas `kind` is non-null whenever `keyFacts` is present, which is what makes the union discriminable. The two are not merged. */
+            keyFacts?: (components["schemas"]["StockKeyFacts"] | components["schemas"]["EtfKeyFacts"] | components["schemas"]["FundKeyFacts"] | components["schemas"]["CryptoKeyFacts"] | components["schemas"]["BondKeyFacts"] | components["schemas"]["CorpBondKeyFacts"]) | null;
+        };
+        /** @description Equity-only key facts. Every field is a relocation of a value already on the profile — no new upstream call (§86.7). */
+        StockKeyFacts: {
+            /**
+             * @description Discriminant; always `stock`.
+             * @constant
+             */
+            kind: "stock";
+            /** @description GICS sector. Null for an unsynced symbol rather than guessed. */
+            sector?: string | null;
+            /** @description GICS industry. */
+            industry?: string | null;
+            /** @description Employee total; null when the provider does not carry it. */
+            employees?: number | null;
+            /** @description Provider string, verbatim. */
+            ceo?: string | null;
+            ipo?: string | null;
+            sharesOutstanding?: number | null;
+            /** @description In `marketCapCurrency`. */
+            marketCap?: number | null;
+        };
+        /** @description One field, and it is a row the backend already fills today and the UI discarded: `ticker_reference.etf_category` (§86). */
+        EtfKeyFacts: {
+            /**
+             * @description Discriminant; always `etf`.
+             * @constant
+             */
+            kind: "etf";
+            /** @description e.g. `Equity`, `Fixed Income`; null when the reference row carries none. */
+            category?: string | null;
+        };
+        /** @description One field, on purpose. The local fund reference carries name + aliases only — there is no manager, category type, OPL/TER, risk class or recommended holding period anywhere in the stack, so the page says so rather than implying coverage. The TFI detail importer that would fix this is recorded as follow-up (§86.10). */
+        FundKeyFacts: {
+            /**
+             * @description Discriminant; always `fund`.
+             * @constant
+             */
+            kind: "fund";
+            /** @description ANALIZY listing code; null for a `TFI::` reference key, which carries none. */
+            categoryCode?: string | null;
+        };
+        /** @description Exactly what the one configured crypto-search provider returns (§86). Market cap, rank, ATH and ATL are **not** declared as nullable fields: they are unavailable from the provider, which is a different statement from "we fetch it and it happens to be empty". */
+        CryptoKeyFacts: {
+            /**
+             * @description Discriminant; always `crypto`.
+             * @constant
+             */
+            kind: "crypto";
+            name?: string | null;
+            /** @description Provider venue code; constant in practice for the current provider. */
+            exchange?: string | null;
+            /** Format: date */
+            icoDate?: string | null;
+            /** @description Null, never 0, when the provider does not carry it. */
+            circulatingSupply?: number | null;
+            /** @description Null, never 0, when the provider does not carry it. */
+            totalSupply?: number | null;
+        };
+        /** @description Polish retail savings bond. Deliberately a separate schema from `CorpBondKeyFacts`: the two field sets are disjoint apart from maturity and nominal, and one schema with fourteen nullable fields would make every reader know which half applies (§86). */
+        BondKeyFacts: {
+            /**
+             * @description Discriminant; always `bond`.
+             * @constant
+             */
+            kind: "bond";
+            seriesCode?: string | null;
+            /** Format: date */
+            issueDate?: string | null;
+            /** Format: date */
+            maturityDate?: string | null;
+            /** @description 0 is a real value, not a missing one. */
+            termMonths?: number | null;
+            /** @description `fixed` | `cpi_12m+margin` | `nbp_ref+margin`; determines what `margin` means. */
+            rateRule?: string | null;
+            /** @description Overloaded, and the label depends on `rateRule` (§86): under `fixed` it **is** the flat annual rate, under `cpi_12m+margin` it is the inflation add-on, under `nbp_ref+margin` the NBP add-on. Never render it as "Margin" without switching on `rateRule`. */
+            margin?: number | null;
+            /** @description Fee `b`, in the quote currency. */
+            redemptionFee?: number | null;
+            nominal?: number | null;
+        };
+        /** @description Catalyst corporate bond (obligacje.pl). `nominalValue` and `currentRate` are numbers here even though the provider sends strings (`"100.0"`, `"7.83%"`): the unit is stripped in the translator, with a guard that yields null rather than NaN. `secured` and `status` stay strings — they are provider text rendered verbatim, never translated (§86). */
+        CorpBondKeyFacts: {
+            /**
+             * @description Discriminant; always `corp_bond`.
+             * @constant
+             */
+            kind: "corp_bond";
+            /** @description Verbatim. */
+            issuer?: string | null;
+            series?: string | null;
+            market?: string | null;
+            /** @description Verbatim, e.g. `Notowane`. */
+            status?: string | null;
+            nominalValue?: number | null;
+            /** @description ISO-4217. */
+            nominalCurrency?: string | null;
+            /** @description Provider's Polish boolean string (`NIE`), verbatim — never mapped to a boolean. */
+            secured?: string | null;
+            /** @description Verbatim, carries its own embedded margin for variable-rate bonds. */
+            couponType?: string | null;
+            /** @description Percent as a number (7.83), never the raw `"7.83%"`. */
+            currentRate?: number | null;
+            /** Format: date */
+            maturityDate?: string | null;
         };
         InstrumentMetrics: {
             metrics?: {
@@ -2595,6 +2832,37 @@ export interface components {
             results?: components["schemas"]["SearchResult"][];
         };
         FundamentalsData: {
+            /**
+             * @description ISO-4217 the three statements below are denominated in, or null when
+             *     they do not agree on one (plan §79.2).
+             *
+             *     The three statements are three independent provider walks, so a
+             *     single instrument can answer with income from one provider and a
+             *     balance sheet from another, in different currencies and units. That
+             *     used to be invisible: every value rendered through `formatCompact`
+             *     with no currency symbol, so a GPW name in PLN and a US name in USD
+             *     were indistinguishable on screen. Null rather than a guess — see
+             *     `currencySource` and `sources`.
+             */
+            currency?: string | null;
+            /**
+             * @description How `currency` was determined (plan §79.2). `provider` only when the
+             *     providers themselves agreed on one declaration; `estimated` when it
+             *     came from the local symbol/exchange resolver (plan §71); `unknown`
+             *     when the statements disagree or nothing declares one.
+             */
+            currencySource?: components["schemas"]["CurrencySource"];
+            /**
+             * @description Which upstream provider satisfied each statement walk (plan §79.2).
+             *     Null per field when the answer did not survive the hop — notably
+             *     when openst or cachest served a body cached before this field
+             *     existed.
+             */
+            sources?: {
+                incomeStatement?: string | null;
+                balanceSheet?: string | null;
+                cashFlow?: string | null;
+            };
             financialHighlights: {
                 incomeStatement?: {
                     year?: number;
@@ -2660,7 +2928,7 @@ export interface components {
             sumOfCurrentPositions: number;
             sumOfCurrentPositionsValue: number;
         };
-        /** @description Instrument research dividend history (`history`) OR the portfolio's own dividend rows (`totalDividends`/`count`/`items`) — see the exposing endpoint. For portfolio items, gross = quantity × price, taxes is the withholding tax, amount is the NET (gross − taxes) per the example-service convention, and convertedAmount is amount in the display currency. The research `/dividends` endpoint always also sets `currency` + `currencySource` (plan §49.6, currency is never null); the portfolio endpoint does not. */
+        /** @description Instrument research dividend history (`history`) OR the portfolio's own dividend rows (`totalDividends`/`count`/`items`) — see the exposing endpoint. For portfolio items, gross = quantity × price, taxes is the withholding tax, amount is the NET (gross − taxes), and convertedAmount is amount in the display currency. The research `/dividends` endpoint always also sets `currency` + `currencySource` (plan §49.6, currency is never null); the portfolio endpoint does not. */
         DividendsData: {
             history?: {
                 date: string;
@@ -2928,15 +3196,19 @@ export interface components {
             userId: string;
             name: string;
             description?: string | null;
-            strategy: string;
-            type: string;
             baseCurrency?: string;
-            totalInvested: number;
+            capitalBasis: number;
             currentValue: number;
             isPublic: boolean;
+            /** @description Read-only view over the instruments carrying `labelId`. Always false on a casual portfolio. */
+            isVirtual?: boolean;
+            /**
+             * Format: uuid
+             * @description The label whose instruments a virtual portfolio mirrors. Always set when `isVirtual` is true; null on a casual portfolio.
+             */
+            labelId?: string | null;
+            cashLegOnTrade?: boolean;
             isMarginEnabled: boolean;
-            marginRate?: number | null;
-            maintenanceMarginRate?: number | null;
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */
@@ -2949,12 +3221,28 @@ export interface components {
             /** @description Portfolio-native cash position (plan §62) */
             cash?: components["schemas"]["PortfolioCash"];
         };
+        /**
+         * @description Body for both POST /portfolios and PATCH /portfolios/{id}.
+         *     Virtual portfolios (`isVirtual: true`) are read-only views over the instruments carrying `labelId` — they have no cash ledger. A virtual request therefore REQUIRES `labelId` (an existing label owned by the caller); a casual portfolio (the default — `isVirtual` false or absent) MUST NOT carry one. A virtual create without a label is rejected 422.
+         *     Update semantics: a virtual portfolio's `cashLegOnTrade` is always false, so PATCH rejects enabling the cash leg on a virtual portfolio (422). PATCH also rejects an update that would leave the virtual/casual state invalid — a `labelId` on a casual portfolio, or clearing a virtual portfolio's `labelId` (both 422).
+         *     OpenAPI 3.0 cannot express a conditional requirement like this without changing the shape every consumer compiles against, so the rule is declared here and enforced server-side by the wallets zod refinement and route guards. `scripts_check_spec.py` asserts these fields stay declared.
+         */
         CreatePortfolioRequest: {
             name: string;
             description?: string | null;
-            strategy?: string;
             currency?: string;
             isPublic?: boolean;
+            /**
+             * @description True for a virtual portfolio; see the schema description for the label requirement.
+             * @default false
+             */
+            isVirtual: boolean;
+            /**
+             * Format: uuid
+             * @description Required when `isVirtual` is true, forbidden otherwise. Null on a casual portfolio.
+             */
+            labelId?: string | null;
+            cashLegOnTrade?: boolean;
         };
         /**
          * @description The dashboard headline aggregate, all amounts in `baseCurrency`.
@@ -2964,11 +3252,19 @@ export interface components {
          *       instrumentsValue  positions only
          *       cashValue         the cash BALANCE (not a flow)
          *       totalValue        instrumentsValue + cashValue
-         *       totalInvested     net external cash flow (see below)
+         *       capitalBasis      capital at risk (external contributions + in-kind cost)
          *
          *     `totalValue` previously excluded cash, which made the headline disagree
          *     with the portfolio cards by exactly the cash balance (§63.3). It now
          *     means the whole account.
+         *
+         *     §41/S3 — `totalInvested` was RENAMED to `capitalBasis`, and the
+         *     genuinely-external figure is now its own field, `externalContributions`.
+         *     The two are different questions and the old names pointed the wrong way:
+         *     the field named `externalCapitalBasis` reported the SAME number as
+         *     `totalInvested` (which includes in-kind transfers) while the function
+         *     named `externalCashInvested` excluded them. That mislabelling already
+         *     caused two wrong conclusions during the transfer work.
          */
         PortfolioTotalMetrics: {
             /** @description Open-position market value only, cash excluded, converted into baseCurrency. Σ of each position's own instrument currency at its own rate — never a raw cross-currency sum. */
@@ -2978,19 +3274,34 @@ export interface components {
             /** @description The whole account: instrumentsValue + cashValue. CHANGED in §68 — this used to be positions-only, which is what made the headline miss cash. */
             totalValue: number;
             /**
-             * @description Net external cash flow in baseCurrency: DEPOSIT − WITHDRAWAL ± TRANSFER legs, each at its own historical rate
-             *     (the §62 `externalCashInvested` basis, reported by `externalCapitalBasisSource`).
+             * @description Capital BASIS in baseCurrency: net external contributions (DEPOSIT − WITHDRAWAL,
+             *     each at its own historical rate) PLUS the cost of anything transferred in or out,
+             *     signed.
              *
-             *     Transfers are part of this definition, not excluded. The honest
-             *     consequence: a transfer between two of the user's own portfolios
-             *     RAISES one portfolio's invested figure and LOWERS the other's. The
-             *     aggregate is unaffected because the legs net to zero, but a
-             *     per-portfolio number on this basis is not "capital you put in".
+             *     At COST, not market: a basis travels with the shares, so the accrued unrealised
+             *     gain is just `totalValue − capitalBasis` and follows whichever account holds the
+             *     stock. Rebasing at the transfer-date market would delete real profit.
+             *
+             *     In-kind transfers are part of this definition, not excluded — this was always the
+             *     stated contract and the implementation did not honour it until §41/#37. The honest
+             *     consequence: a transfer between two of the user's own portfolios RAISES one
+             *     portfolio's basis and LOWERS the other's. The aggregate is unaffected because the
+             *     legs net to zero, but a per-portfolio number on this basis is NOT "capital you put
+             *     in" — that is `externalContributions`.
              */
-            totalInvested: number;
-            /** @description totalValue − totalInvested. Moves with §68's change to totalValue. */
+            capitalBasis: number;
+            /**
+             * @description Money actually put in and taken out: DEPOSIT − WITHDRAWAL only, each at its own
+             *     historical rate. EXCLUDES in-kind stock transfers, which move no money.
+             *
+             *     The counterpart to `capitalBasis`, not a variant of it. Keep them apart —
+             *     conflating "money put in" with "capital at risk" is what got `ADJUSTMENT` into
+             *     trouble (§89.5).
+             */
+            externalContributions?: number | null;
+            /** @description totalValue − capitalBasis. Moves with §68's change to totalValue. */
             totalGainLoss?: number;
-            /** @description totalGainLoss / totalInvested. Moves with §68's change to totalValue. */
+            /** @description totalGainLoss / capitalBasis. Moves with §68's change to totalValue. */
             returnPercentage?: number;
             baseCurrency: string;
             /** @description Per-portfolio rows. §68 — each carries the same cash/instruments split, so Σ breakdown == the headline and a card can render its own split without a second request. */
@@ -3003,7 +3314,7 @@ export interface components {
                 cashValue: number;
                 /** @description instrumentsValue + cashValue for this portfolio. */
                 totalValue: number;
-                totalInvested: number;
+                capitalBasis: number;
                 returnPercentage?: number;
                 weight?: number;
                 /** @description Open positions with no market value */
@@ -3016,9 +3327,8 @@ export interface components {
                 /** @description 'quote' or 'fallback' — whether the value is a live price or a remembered one. */
                 priceSource?: string | null;
             }[];
-            externalCapitalReturnPercent?: number | null;
-            externalCapitalReturnAmount?: number | null;
-            externalCapitalBasis?: number | null;
+            capitalBasisReturnPercent?: number | null;
+            capitalBasisReturnAmount?: number | null;
             /**
              * @description Open positions excluded from `instrumentsValue` because no market value is known (§70).
              *     They are NOT valued at their cost basis — a cost is not a price, and a plausible
@@ -3040,9 +3350,9 @@ export interface components {
              *     the figure is a remembered price, not a current one.
              */
             priceSource?: string | null;
-            externalCapitalBasisSource?: string | null;
-            externalCapitalSuppressedReason?: string | null;
-            externalCapitalReturnBasisKind?: string | null;
+            capitalBasisSource?: string | null;
+            capitalBasisSuppressedReason?: string | null;
+            capitalBasisReturnBasisKind?: string | null;
             /** @description Per-currency cash summary (dashboard cash card) */
             cashBreakdown?: {
                 currency: string;
@@ -3178,6 +3488,7 @@ export interface components {
                 [key: string]: unknown;
             };
             displayCurrency: string;
+            portfolioName?: string | null;
             logo?: string | null;
             labels?: components["schemas"]["Label"][];
         };
@@ -3206,7 +3517,7 @@ export interface components {
             timeframe?: string;
             performance?: {
                 totalValue?: number;
-                totalInvested?: number;
+                capitalBasis?: number;
                 totalReturn?: number;
                 totalReturnPercent?: number;
                 simpleReturnPercent?: number;
@@ -3235,6 +3546,8 @@ export interface components {
                     date?: string;
                     value?: number;
                     invested?: number | null;
+                    unpricedValue?: number;
+                    carriedValue?: number;
                     cumulativeTwr?: number;
                     cumulativeMwr?: number;
                     cumulativeSimple?: number;
@@ -3257,6 +3570,12 @@ export interface components {
                 returnPercent?: number;
             }[];
             gapSymbols?: string[] | null;
+            /** @description gapSymbols still held on the window's last day. Non-empty ⇒ the latest stored value excludes them. Empty while `gapSymbols` is non-empty ⇒ the history is a partial sum but the current value is complete, and the UI must say that instead of "value is short". */
+            heldGapSymbols?: string[] | null;
+            /** @description symbol → number of held days with no returned bar, across the backfill window. Non-empty ⇒ the stored history has coverage steps that are not market moves, and the UI should say so rather than let a step read as a real return. Empty/absent ⇒ no such holes. Overlaps `gapSymbols` freely: a symbol may be listed in both, and means something different by each. */
+            fxCoverageHoles?: {
+                [key: string]: number;
+            } | null;
         };
         PortfolioSnapshot: {
             allocation?: {
@@ -3326,15 +3645,14 @@ export interface components {
                 closedPositions: number;
                 realizedGainLoss: number;
                 unrealizedGainLoss: number;
-                totalInvested: number;
+                capitalBasis: number;
                 income: number;
                 returnBasis: number;
-                externalCapitalReturnPercent?: number | null;
-                externalCapitalReturnAmount?: number | null;
-                externalCapitalBasis?: number | null;
-                externalCapitalBasisSource?: string | null;
-                externalCapitalSuppressedReason?: string | null;
-                externalCapitalReturnBasisKind?: string | null;
+                capitalBasisReturnPercent?: number | null;
+                capitalBasisReturnAmount?: number | null;
+                capitalBasisSource?: string | null;
+                capitalBasisSuppressedReason?: string | null;
+                capitalBasisReturnBasisKind?: string | null;
             };
             positions?: components["schemas"]["PositionSummary"][];
             cash?: components["schemas"]["PortfolioCash"];
@@ -3376,7 +3694,11 @@ export interface components {
             totalValue: number;
             /** @description This portfolio's cash balance in `currency`. May be negative on a margin account. */
             cashValue: number;
-            totalInvested: number;
+            /** @description Capital BASIS: external contributions plus the cost of anything transferred in or out, signed. At COST — see PortfolioTotalMetrics.capitalBasis. */
+            capitalBasis: number;
+            /** @description Money actually put in and taken out: DEPOSIT − WITHDRAWAL only. EXCLUDES in-kind stock transfers, which move no money. The counterpart to `capitalBasis`, not a variant — conflating the two is what got ADJUSTMENT into trouble (§89.5). */
+            externalContributions?: number | null;
+            /** @description (totalValue − capitalBasis) / capitalBasis, and 0 when capitalBasis ≤ 0 — a non-positive basis would otherwise report a signed nonsense figure. */
             simpleReturnPercent: number;
             investmentReturnPercent: number;
             currencyImpactPercent: number;
@@ -3403,12 +3725,11 @@ export interface components {
             priceAsOf?: string | null;
             /** @description 'quote' or 'fallback' — whether the value is a live price or a remembered one. */
             priceSource?: string | null;
-            externalCapitalReturnPercent?: number | null;
-            externalCapitalReturnAmount?: number | null;
-            externalCapitalBasis?: number | null;
-            externalCapitalBasisSource?: string | null;
-            externalCapitalSuppressedReason?: string | null;
-            externalCapitalReturnBasisKind?: string | null;
+            capitalBasisReturnPercent?: number | null;
+            capitalBasisReturnAmount?: number | null;
+            capitalBasisSource?: string | null;
+            capitalBasisSuppressedReason?: string | null;
+            capitalBasisReturnBasisKind?: string | null;
             historyCoherence?: {
                 status?: string;
                 reason?: string | null;
@@ -3416,7 +3737,7 @@ export interface components {
                 issues?: Record<string, never>[];
             };
         };
-        /** @description A portfolio transaction row. For `type: DIVIDEND` the example-service convention applies (verified against the live API 2026-09-26): `price` is the per-share gross dividend, `quantity × price` is the gross total, `taxes` is the withholding tax, and `totalAmount` is the **net** (gross − taxes). BUY/SELL rows keep `totalAmount = quantity × price + fees`. */
+        /** @description A portfolio transaction row. For `type: DIVIDEND`, `price` is the per-share gross dividend, `quantity × price` is the gross total, `taxes` is the withholding tax, and `totalAmount` is the **net** (gross − taxes). BUY/SELL rows keep `totalAmount = quantity × price + fees`. `TRANSFER_OUT`/`TRANSFER_IN` rows are an in-kind movement of the instrument between portfolios: `price` is the source lot's cost carried over unchanged, `totalAmount` is informational, `realizedGainLoss` is absent because nothing was disposed of, and the row has **no cash effect and is not an external flow**. It must not be read as a trade. */
         Transaction: components["schemas"]["FeeFxFields"] & {
             /** Format: uuid */
             id: string;
@@ -3438,19 +3759,20 @@ export interface components {
             priceCurrency: string;
             instrumentCurrency: string;
             assetType: string;
-            isGift: boolean;
-            synthesizedOpeningLot: boolean;
             /** Format: date-time */
             executedAt: string;
             /** Format: date-time */
             createdAt: string;
+            /** @description Currency used to display and total the row; the owning portfolio's base currency */
             displayCurrency: string;
             convertedTotalAmount: number;
             convertedPrice: number;
             convertedFees: number;
             convertedRealizedGainLoss?: number | null;
-            sector?: string;
-            country?: string;
+            /** @description Sector of the transaction's position (read from the position, not stored on the row) */
+            sector?: string | null;
+            /** @description Country of the position's instrument, read from the position */
+            country?: string | null;
             /** @description Import provenance tag; NULL for manually-created rows */
             externalSource?: string | null;
             /** @description Importer-supplied dedup key; unique per externalSource */
@@ -3505,7 +3827,6 @@ export interface components {
             currency?: string;
             description?: string;
             transactionDate?: string;
-            paymentMethod?: string;
         };
         TransferCashRequest: components["schemas"]["FeeFxFields"] & {
             amount: number;
@@ -3537,12 +3858,10 @@ export interface components {
             type: string;
             amount: number;
             currency: string;
-            status: string;
             /** Format: date-time */
             createdAt: string;
             description?: string | null;
             transactionDate?: string | null;
-            paymentMethod?: string | null;
             fees?: number | null;
             feesType?: string | null;
             /** Format: uuid */
@@ -3652,8 +3971,6 @@ export interface components {
             description?: string | null;
             /** Format: date */
             transactionDate?: string | null;
-            status?: string;
-            paymentMethod?: string | null;
             fees?: number | null;
             /** @enum {string|null} */
             feesType?: "fixed" | "pct" | null;
@@ -3668,8 +3985,13 @@ export interface components {
         ImportPortfolioTx: components["schemas"]["FeeFxFields"] & {
             /** Format: uuid */
             portfolioId: string;
-            /** @enum {string} */
-            type: "BUY" | "SELL" | "DIVIDEND" | "EXPIRATION";
+            /**
+             * @description `TRANSFER_OUT` moves an instrument, unchanged, out of this portfolio to another one — a real in-kind (delivery-versus- payment-free) transfer between brokers. It is NOT a sale: no realised P/L is booked and no cash moves. `TRANSFER_IN` is its receiving leg. Send only `TRANSFER_OUT`; the receiving leg is derived by the server, one row per source lot drawn FIFO, each carrying that lot's own price. `quantity` on such a row is the quantity to move; `price` is the source lot's cost and is determined server-side from the FIFO draw, not supplied by the caller.
+             * @enum {string}
+             */
+            type: "BUY" | "SELL" | "DIVIDEND" | "EXPIRATION" | "TRANSFER_OUT" | "TRANSFER_IN";
+            /** @description Required iff `type` is `TRANSFER_OUT`; must exist and differ from the source portfolio. The receiving portfolio takes the instrument at the source lot's cost basis. */
+            toPortfolioName?: string | null;
             instrumentSymbol: string;
             instrumentName?: string | null;
             /** @default STOCK */
@@ -3722,6 +4044,27 @@ export interface components {
                 message?: string;
             }[];
             syncRun?: components["schemas"]["SyncRun"];
+            /**
+             * @description Portfolios whose history this import changed, each with the number of
+             *     rows inserted into it. Empty/absent when the batch inserted nothing.
+             *     This is the set a full re-backfill was queued for, so it is also the
+             *     set to look at when a chart looks stale after an import.
+             */
+            affectedPortfolios?: {
+                /** Format: uuid */
+                portfolioId: string;
+                /** @description Portfolio name at import time — an operator reading a log wants the name */
+                name?: string | null;
+                /** @description Rows INSERTED into this portfolio by this batch. */
+                rowCount: number;
+            }[];
+            /**
+             * @description Whether a re-backfill was enqueued. Distinguishes "nothing changed, so
+             *     nothing to rebuild" (false) from "rebuild queued but the queue is
+             *     backed up" — which the caller can then read off
+             *     `portfolio_backfill_metadata` instead of guessing from a log line.
+             */
+            backfillQueued?: boolean;
         };
         SyncRun: {
             id: number;
@@ -3761,6 +4104,8 @@ export interface components {
             factor: number;
             /** Format: date */
             effectiveDate: string;
+            /** @description Event provenance, for example openst:fmp or admin */
+            source?: string;
         };
         ApplySplitResponse: {
             updatedTransactions: number;
@@ -3860,11 +4205,13 @@ export interface components {
             /** @description Overflow rows cleaned up in the last run (written by post-import hook) */
             rowsDeleted?: number | null;
         };
-        /** @description Detected price discontinuity at the stooq/overflow boundary awaiting admin review. */
+        /** @description Provider-backed or heuristic split candidate. detectedAt is discovery time; effectiveDate is when the split took effect. */
         SplitCandidate: {
             symbol: string;
             /** Format: date */
             detectedAt: string;
+            /** Format: date */
+            effectiveDate: string | null;
             /** Format: date */
             lastStooqDate?: string | null;
             lastStooqClose?: string | null;
@@ -3874,6 +4221,14 @@ export interface components {
             ratio?: string | null;
             suggestedFactor?: string | null;
             suggestedRatio?: string | null;
+            provider?: string | null;
+            providerNumerator?: string | null;
+            providerDenominator?: string | null;
+            providerFactor?: string | null;
+            providerStatus?: string;
+            evidence?: unknown;
+            /** Format: date-time */
+            appliedAt?: string | null;
             /** @enum {string} */
             status: "pending" | "applied" | "dismissed";
         };
@@ -3927,6 +4282,91 @@ export interface components {
         AdminFxRatesResponse: {
             items: components["schemas"]["AdminFxRate"][];
             pagination: components["schemas"]["AdminPagination"];
+        };
+        AdminListingOverride: {
+            /** @description `<EXCHANGE>::<TICKER>` — the venue-qualified primary key. */
+            listingKey: string;
+            ticker: string;
+            /** @description Venue/exchange code (e.g. NYSE, LSE, TSX). */
+            exchange: string;
+            /** @description ISO-4217 quote currency for this listing. */
+            quoteCurrency: string;
+            assetType: string;
+            /** @enum {string} */
+            status: "active" | "disabled";
+            /** @description Why the override exists (required; reviewed with the row). */
+            rationale: string;
+            /** @description Where the fact came from (issue ref, analyst, source URL). */
+            provenance: string;
+            /**
+             * @description Which writer won — `admin` for an admin edit, or the curated
+             *     source version string when seeded from the versioned source.
+             */
+            sourceVersion: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @description A GitHub ticker-reference row exists for the same listingKey. */
+            upstreamPresent: boolean;
+            /** @description More than one upstream row shares this ticker (venue ambiguity). */
+            tickerConflict: boolean;
+            /**
+             * @description Curated always outranks upstream. Surfaced explicitly so a conflict
+             *     is visible rather than silently resolved.
+             * @enum {string}
+             */
+            precedence: "curated";
+        };
+        AdminListingOverrideInput: {
+            ticker: string;
+            exchange: string;
+            quoteCurrency: string;
+            assetType: string;
+            /**
+             * @default active
+             * @enum {string}
+             */
+            status: "active" | "disabled";
+            rationale: string;
+            provenance: string;
+        };
+        AdminListingOverridesResponse: {
+            items: components["schemas"]["AdminListingOverride"][];
+            pagination: components["schemas"]["AdminPagination"];
+        };
+        AdminListingOverrideHistoryEntry: {
+            id: number;
+            listingKey: string;
+            /** @enum {string} */
+            action: "created" | "updated" | "disabled";
+            /** @description The override row as written, verbatim (free-form JSON). */
+            snapshot?: unknown;
+            /** @description `<user-id> <email>` of the writer. */
+            actor: string;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        AdminListingOverrideHistoryResponse: {
+            items: components["schemas"]["AdminListingOverrideHistoryEntry"][];
+        };
+        AdminListingOverridePreview: {
+            listingKey: string;
+            ticker: string;
+            exchange: string;
+            /** @description An upstream GitHub row exists for this exact listing key. */
+            upstreamPresent: boolean;
+            /** @description More than one upstream row shares this ticker. */
+            tickerConflict: boolean;
+            /**
+             * @description Quote currency the upstream reference currently resolves for this
+             *     key, so a reviewer sees the value the override would replace.
+             */
+            upstreamCurrency?: string | null;
+            /** @description The override already stored for this key, if any. */
+            existingOverride?: components["schemas"]["AdminListingOverride"] | null;
+            /** @enum {string} */
+            precedence: "curated";
         };
         TopologyStatusResponse: {
             services: components["schemas"]["TopologyServiceStatus"][];
@@ -5104,6 +5544,8 @@ export interface operations {
             query: {
                 from: string;
                 to: string;
+                /** @description Include the latest preceding bar when its currency can be resolved */
+                includePrevious?: boolean;
                 /** @description Optional ISO-4217 target currency — prices are converted server-side (plan §48.2); same/absent value serves the native series */
                 currency?: components["parameters"]["currency"];
                 /** @description Optional ISO-4217 currency the CALLER believes the prices are denominated in (e.g. wallets passes the position's `instrumentCurrency`). Honoured only where the server's own resolver is silent; a locally resolved base is never overridden (plan §47, "never guess"). Without it, a ticker listed on several venues in different currencies cannot be converted at all, which made `currency` unusable for the caller's whole request (plan §63.10.5). */
@@ -5375,6 +5817,28 @@ export interface operations {
             };
         };
     };
+    getAllPositions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Positions */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        positions?: components["schemas"]["Position"][];
+                    };
+                };
+            };
+        };
+    };
     getPortfolioShares: {
         parameters: {
             query?: never;
@@ -5406,6 +5870,8 @@ export interface operations {
                 labels?: string;
                 /** @description Filter by instrument symbol. Must be in canonical form: bare ticker for US listings (AAPL, SAP), Yahoo venue suffix for others (SAP.DE, SNT.WA). Case-insensitive exact match. */
                 instrumentSymbol?: string;
+                /** @description Case-insensitive partial match against instrument symbol or company name. */
+                search?: string;
             };
             header?: never;
             path?: never;
@@ -5737,6 +6203,8 @@ export interface operations {
                 labels?: string;
                 /** @description Filter by instrument symbol. Must be in canonical form: bare ticker for US listings (AAPL, SAP), Yahoo venue suffix for others (SAP.DE, SNT.WA). Case-insensitive exact match. */
                 instrumentSymbol?: string;
+                /** @description Case-insensitive partial match against instrument symbol or company name. */
+                search?: string;
             };
             header?: never;
             path: {
@@ -6162,6 +6630,8 @@ export interface operations {
                 limit?: number;
                 /** @description Comma-separated label ids; AND filter (entity must have all) */
                 labels?: string;
+                /** @description Case-insensitive partial match against the linked transaction's ticker or company name. */
+                search?: string;
             };
             header?: never;
             path: {
@@ -6269,6 +6739,8 @@ export interface operations {
                 sortOrder?: "asc" | "desc";
                 /** @description Comma-separated label ids; AND filter (entity must have all) */
                 labels?: string;
+                /** @description Case-insensitive partial match against the linked transaction's ticker or company name. */
+                search?: string;
             };
             header?: never;
             path?: never;
@@ -7012,8 +7484,10 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": {
-                    /** @description Split adjustment factor (e.g. 0.25 for 4:1) */
+                    /** @description Quantity multiplier (e.g. 4 for 4:1 or 0.2 for 1:5) */
                     factor: number;
+                    /** Format: date */
+                    effectiveDate: string;
                 };
             };
         };
@@ -7029,7 +7503,7 @@ export interface operations {
                         symbol?: string;
                         factor?: number;
                         /** Format: date */
-                        detectedAt?: string;
+                        effectiveDate?: string;
                     };
                 };
             };
@@ -7180,6 +7654,313 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AdminFxRatesResponse"];
+                };
+            };
+            /** @description Missing or invalid token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not a portfoliost_admin */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    listAdminListingOverrides: {
+        parameters: {
+            query?: {
+                page?: number;
+                per_page?: number;
+                search?: string;
+                status?: "active" | "disabled";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Paginated override list */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminListingOverridesResponse"];
+                };
+            };
+            /** @description Missing or invalid token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not a portfoliost_admin */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    createAdminListingOverride: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminListingOverrideInput"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminListingOverride"];
+                };
+            };
+            /** @description Missing or invalid token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not a portfoliost_admin */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description An override for this listing key already exists */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    previewAdminListingOverride: {
+        parameters: {
+            query: {
+                ticker: string;
+                exchange: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Precedence and conflict metadata for the proposed key */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminListingOverridePreview"];
+                };
+            };
+            /** @description Missing or invalid token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not a portfoliost_admin */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Ticker or exchange missing/invalid */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    updateAdminListingOverride: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description `<EXCHANGE>::<TICKER>` (URL-encoded) */
+                listingKey: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminListingOverrideInput"];
+            };
+        };
+        responses: {
+            /** @description Updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminListingOverride"];
+                };
+            };
+            /** @description Missing or invalid token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not a portfoliost_admin */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description No override with that listing key */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    disableAdminListingOverride: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description `<EXCHANGE>::<TICKER>` (URL-encoded) */
+                listingKey: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Disabled */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminListingOverride"];
+                };
+            };
+            /** @description Missing or invalid token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not a portfoliost_admin */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description No override with that listing key */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    getAdminListingOverrideHistory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description `<EXCHANGE>::<TICKER>` (URL-encoded) */
+                listingKey: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description History, newest first */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminListingOverrideHistoryResponse"];
                 };
             };
             /** @description Missing or invalid token */
