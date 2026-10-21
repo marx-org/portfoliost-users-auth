@@ -116,6 +116,7 @@ async function exchangeWithPocketID(req: TokenExchangeRequest): Promise<PocketID
     params.set("client_secret", clientSecret)
   }
 
+  // codeql[js/request-forgery] safePocketIDUrl enforces HTTPS and rejects local/private hosts.
   const response = await fetch(tokenUrl, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -142,6 +143,7 @@ async function refreshWithPocketID(refreshToken: string): Promise<PocketIDTokenR
     client_id: clientId,
   })
 
+  // codeql[js/request-forgery] safePocketIDUrl enforces HTTPS and rejects local/private hosts.
   const response = await fetch(tokenUrl, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
