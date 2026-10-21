@@ -5,20 +5,34 @@ import { getDb, type DB } from "../db/index.js"
 import { refreshSessions, userPreferences } from "../db/schema.js"
 import type { components } from "../generated/api-types.js"
 
-function safePocketIDUrl(value: string | undefined): string {
-  if (!value) throw new Error("PocketID not configured")
+function canonicalUrl(value: string, field: string): string {
   const url = new URL(value)
-  const blockedHost = /^(localhost|127(?:\.\d{1,3}){3}|0\.0\.0\.0|::1)$/i.test(url.hostname)
-    || url.hostname === "pocket-id.test"
-    || url.hostname.endsWith(".local")
-    || url.hostname.endsWith(".internal")
-  if (process.env.NODE_ENV !== "production" && url.protocol === "http:" && blockedHost) {
-    return url.href
+  if (!(["http:", "https:"] as string[]).includes(url.protocol)) {
+    throw new Error(`${field} must use HTTP or HTTPS`)
   }
-  if (url.protocol !== "https:" || blockedHost) {
-    throw new Error("PocketID token URL must use an external HTTPS endpoint")
+  if (url.username || url.password || url.hash) {
+    throw new Error(`${field} must not contain credentials or a fragment`)
   }
   return url.href
+}
+
+function exactUrlAllowlist(name: string): Set<string> {
+  const values = process.env[name]
+    ?.split(",")
+    .map((value) => value.trim())
+    .filter(Boolean)
+
+  if (!values?.length) throw new Error(`${name} is not configured`)
+  return new Set(values.map((value) => canonicalUrl(value, name)))
+}
+
+function safePocketIDUrl(value: string | undefined): string {
+  if (!value) throw new Error("PocketID not configured")
+  const tokenUrl = canonicalUrl(value, "POCKETID_TOKEN_URL")
+  if (!exactUrlAllowlist("POCKETID_ALLOWED_TOKEN_URLS").has(tokenUrl)) {
+    throw new Error("POCKETID_TOKEN_URL is not allowed")
+  }
+  return tokenUrl
 }
 
 type AuthResponse = components["schemas"]["AuthResponse"]
@@ -40,7 +54,7 @@ function allowedRedirectUris(): Set<string> {
     .filter(Boolean)
 
   if (configured?.length) {
-    return new Set(configured.map((value) => new URL(value).href))
+    return new Set(configured.map((value) => canonicalUrl(value, "POCKETID_ALLOWED_REDIRECT_URIS")))
   }
 
   // Local compose has a fixed callback. Production must configure the list
@@ -153,6 +167,7 @@ async function exchangeWithPocketID(req: TokenExchangeRequest): Promise<PocketID
   //lgtm[js/request-forgery]
   const response = await fetch(tokenUrl, {
     method: "POST",
+    redirect: "error",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: params.toString(),
   })
@@ -180,6 +195,7 @@ async function refreshWithPocketID(refreshToken: string): Promise<PocketIDTokenR
   //lgtm[js/request-forgery]
   const response = await fetch(tokenUrl, {
     method: "POST",
+    redirect: "error",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: params.toString(),
   })

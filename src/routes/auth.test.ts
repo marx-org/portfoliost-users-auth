@@ -67,6 +67,7 @@ describe("Auth Routes", () => {
     delete process.env.POCKETID_AUDIENCE
     delete process.env.POCKETID_TOKEN_URL
     delete process.env.POCKETID_CLIENT_ID
+    delete process.env.POCKETID_ALLOWED_TOKEN_URLS
     delete process.env.POCKETID_ALLOWED_REDIRECT_URIS
   }
 
@@ -96,6 +97,8 @@ describe("Auth Routes", () => {
   let app: Hono
 
   beforeEach(async () => {
+    process.env.POCKETID_ALLOWED_TOKEN_URLS =
+      "http://pocket-id.test/api/oidc/token,https://pocket-id.example/oauth2/token"
     process.env.POCKETID_ALLOWED_REDIRECT_URIS =
       "https://app.example/auth/callback,http://localhost:3000/auth/callback"
     ctx = await createTestDb()
@@ -156,6 +159,38 @@ describe("Auth Routes", () => {
             code: "attacker-code",
             verifier: "attacker-verifier",
             redirect_uri: "https://attacker.example/auth/callback",
+          }),
+        })
+
+        expect(res.status).toBe(401)
+        expect(fetchCalled).toBe(false)
+      } finally {
+        globalThis.fetch = origFetch
+        delete process.env.POCKETID_TOKEN_URL
+        delete process.env.POCKETID_CLIENT_ID
+        process.env.NODE_ENV = "test"
+      }
+    })
+
+    it("does not fetch a token endpoint outside the configured allowlist", async () => {
+      process.env.NODE_ENV = "production"
+      process.env.POCKETID_TOKEN_URL = "https://attacker.example/oauth2/token"
+      process.env.POCKETID_CLIENT_ID = "test-client"
+      let fetchCalled = false
+      const origFetch = globalThis.fetch
+      globalThis.fetch = (async () => {
+        fetchCalled = true
+        return new Response(null, { status: 500 })
+      }) as typeof fetch
+
+      try {
+        const res = await app.request("/api/auth/token", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            code: "code",
+            verifier: "verifier",
+            redirect_uri: "https://app.example/auth/callback",
           }),
         })
 
