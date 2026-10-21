@@ -31,6 +31,39 @@ interface TokenExchangeRequest {
   redirect_uri: string
 }
 
+const DEV_REDIRECT_URI = "http://localhost:3000/auth/callback"
+
+function allowedRedirectUris(): Set<string> {
+  const configured = process.env.POCKETID_ALLOWED_REDIRECT_URIS
+    ?.split(",")
+    .map((value) => value.trim())
+    .filter(Boolean)
+
+  if (configured?.length) {
+    return new Set(configured.map((value) => new URL(value).href))
+  }
+
+  // Local compose has a fixed callback. Production must configure the list
+  // explicitly instead of accepting a callback supplied by the browser.
+  if (process.env.NODE_ENV !== "production") return new Set([DEV_REDIRECT_URI])
+  throw new Error("POCKETID_ALLOWED_REDIRECT_URIS is not configured")
+}
+
+function validateRedirectUri(value: string): string {
+  let redirectUri: URL
+  try {
+    redirectUri = new URL(value)
+  } catch {
+    throw new Error("Invalid redirect_uri")
+  }
+
+  if (!allowedRedirectUris().has(redirectUri.href)) {
+    throw new Error("redirect_uri is not allowed")
+  }
+
+  return redirectUri.href
+}
+
 interface PocketIDTokenResponse {
   access_token: string
   token_type: string
@@ -99,6 +132,7 @@ async function exchangeWithPocketID(req: TokenExchangeRequest): Promise<PocketID
   const tokenUrl = safePocketIDUrl(process.env.POCKETID_TOKEN_URL)
   const clientId = process.env.POCKETID_CLIENT_ID
   const clientSecret = process.env.POCKETID_CLIENT_SECRET
+  const redirectUri = validateRedirectUri(req.redirect_uri)
 
   if (!tokenUrl || !clientId) {
     throw new Error("PocketID not configured")
@@ -108,7 +142,7 @@ async function exchangeWithPocketID(req: TokenExchangeRequest): Promise<PocketID
     grant_type: "authorization_code",
     code: req.code,
     code_verifier: req.verifier,
-    redirect_uri: req.redirect_uri,
+    redirect_uri: redirectUri,
     client_id: clientId,
   })
 
