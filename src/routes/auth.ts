@@ -5,6 +5,22 @@ import { getDb, type DB } from "../db/index.js"
 import { refreshSessions, userPreferences } from "../db/schema.js"
 import type { components } from "../generated/api-types.js"
 
+function safePocketIDUrl(value: string | undefined): string {
+  if (!value) throw new Error("PocketID not configured")
+  const url = new URL(value)
+  const blockedHost = /^(localhost|127(?:\.\d{1,3}){3}|0\.0\.0\.0|::1)$/i.test(url.hostname)
+    || url.hostname === "pocket-id.test"
+    || url.hostname.endsWith(".local")
+    || url.hostname.endsWith(".internal")
+  if (process.env.NODE_ENV !== "production" && url.protocol === "http:" && blockedHost) {
+    return url.href
+  }
+  if (url.protocol !== "https:" || blockedHost) {
+    throw new Error("PocketID token URL must use an external HTTPS endpoint")
+  }
+  return url.href
+}
+
 type AuthResponse = components["schemas"]["AuthResponse"]
 type AuthUser = components["schemas"]["AuthUser"]
 type MeResponse = components["schemas"]["MeResponse"]
@@ -80,7 +96,7 @@ async function persistRefreshSession(
 }
 
 async function exchangeWithPocketID(req: TokenExchangeRequest): Promise<PocketIDTokenResponse> {
-  const tokenUrl = process.env.POCKETID_TOKEN_URL
+  const tokenUrl = safePocketIDUrl(process.env.POCKETID_TOKEN_URL)
   const clientId = process.env.POCKETID_CLIENT_ID
   const clientSecret = process.env.POCKETID_CLIENT_SECRET
 
@@ -100,6 +116,7 @@ async function exchangeWithPocketID(req: TokenExchangeRequest): Promise<PocketID
     params.set("client_secret", clientSecret)
   }
 
+  //lgtm[js/request-forgery]
   const response = await fetch(tokenUrl, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -107,9 +124,8 @@ async function exchangeWithPocketID(req: TokenExchangeRequest): Promise<PocketID
   })
 
   if (!response.ok) {
-    const error = await response.text()
-    console.error("PocketID token exchange failed:", response.status, error)
-    throw new Error(`Token exchange failed: ${error}`)
+    console.error("PocketID token exchange failed:", response.status)
+    throw new Error("Token exchange failed")
   }
 
   return response.json()
@@ -117,7 +133,7 @@ async function exchangeWithPocketID(req: TokenExchangeRequest): Promise<PocketID
 
 /** Redeem a stored refresh token at Pocket-ID for a new token set. */
 async function refreshWithPocketID(refreshToken: string): Promise<PocketIDTokenResponse> {
-  const tokenUrl = process.env.POCKETID_TOKEN_URL
+  const tokenUrl = safePocketIDUrl(process.env.POCKETID_TOKEN_URL)
   const clientId = process.env.POCKETID_CLIENT_ID
   if (!tokenUrl || !clientId) throw new Error("PocketID not configured")
 
@@ -127,6 +143,7 @@ async function refreshWithPocketID(refreshToken: string): Promise<PocketIDTokenR
     client_id: clientId,
   })
 
+  //lgtm[js/request-forgery]
   const response = await fetch(tokenUrl, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -134,9 +151,8 @@ async function refreshWithPocketID(refreshToken: string): Promise<PocketIDTokenR
   })
 
   if (!response.ok) {
-    const error = await response.text()
-    console.error("PocketID token refresh failed:", response.status, error)
-    throw new Error(`Token refresh failed: ${error}`)
+    console.error("PocketID token refresh failed:", response.status)
+    throw new Error("Token refresh failed")
   }
 
   return response.json()
