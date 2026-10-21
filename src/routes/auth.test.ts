@@ -67,6 +67,7 @@ describe("Auth Routes", () => {
     delete process.env.POCKETID_AUDIENCE
     delete process.env.POCKETID_TOKEN_URL
     delete process.env.POCKETID_CLIENT_ID
+    delete process.env.POCKETID_ALLOWED_REDIRECT_URIS
   }
 
   async function signToken(opts: {
@@ -95,6 +96,8 @@ describe("Auth Routes", () => {
   let app: Hono
 
   beforeEach(async () => {
+    process.env.POCKETID_ALLOWED_REDIRECT_URIS =
+      "https://app.example/auth/callback,http://localhost:3000/auth/callback"
     ctx = await createTestDb()
     app = new Hono()
     app.route("/api/auth", createAuthRoutes(ctx.db))
@@ -102,6 +105,7 @@ describe("Auth Routes", () => {
 
   afterEach(async () => {
     await ctx.client.close()
+    delete process.env.POCKETID_ALLOWED_REDIRECT_URIS
   })
 
   describe("POST /api/auth/token", () => {
@@ -131,6 +135,38 @@ describe("Auth Routes", () => {
       expect(data.token_type).toBe("Bearer")
       expect(data.user).toBeDefined()
       expect(data.user.email).toBe("dev@example.com")
+    })
+
+    it("rejects redirect URIs outside the configured allowlist", async () => {
+      process.env.NODE_ENV = "production"
+      process.env.POCKETID_TOKEN_URL = "https://pocket-id.example/oauth2/token"
+      process.env.POCKETID_CLIENT_ID = "test-client"
+      let fetchCalled = false
+      const origFetch = globalThis.fetch
+      globalThis.fetch = (async () => {
+        fetchCalled = true
+        return new Response(null, { status: 500 })
+      }) as typeof fetch
+
+      try {
+        const res = await app.request("/api/auth/token", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            code: "attacker-code",
+            verifier: "attacker-verifier",
+            redirect_uri: "https://attacker.example/auth/callback",
+          }),
+        })
+
+        expect(res.status).toBe(401)
+        expect(fetchCalled).toBe(false)
+      } finally {
+        globalThis.fetch = origFetch
+        delete process.env.POCKETID_TOKEN_URL
+        delete process.env.POCKETID_CLIENT_ID
+        process.env.NODE_ENV = "test"
+      }
     })
 
     it("includes groups from id_token claims in the user object", async () => {
