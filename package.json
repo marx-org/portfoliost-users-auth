@@ -14,7 +14,7 @@
     "gen:types": "openapi-typescript node_modules/@marx-org/contracts/openapi.yaml -o src/generated/api-types.d.ts"
   },
   "dependencies": {
-    "@hono/node-server": "^2.1.5",
+    "@hono/node-server": "^2.1.6",
     "@marx-org/contracts": "^1.6.81",
     "@marx-org/otel": "^1.0.7",
     "@opentelemetry/auto-instrumentations-node": "^0.82.0",
